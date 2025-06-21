@@ -1,0 +1,11 @@
+# Core packages (Streamlit Cloud 호환 버전)
+streamlit>=1.29.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Excel/Word processing
+openpyxl>=3.0.0
+xlsxwriter>=3.0.0
+python-docx>=0.8.11
+
+# 최소 필수 패키지만 포함 (Streamlit Cloud용)
