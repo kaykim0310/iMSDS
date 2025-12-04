@@ -9,7 +9,26 @@
 import requests
 import json
 import time
+import xml.etree.ElementTree as ET
 from typing import Dict, Optional, Any, List
+from urllib.parse import quote
+
+# Streamlit secrets에서 API 키 로드 시도
+def get_kosha_api_key() -> Optional[str]:
+    """Streamlit secrets 또는 환경변수에서 KOSHA API 키 가져오기"""
+    try:
+        import streamlit as st
+        return st.secrets.get("KOSHA_API_KEY")
+    except Exception:
+        pass
+
+    try:
+        import os
+        return os.environ.get("KOSHA_API_KEY")
+    except Exception:
+        pass
+
+    return None
 
 
 class PubChemFetcher:
@@ -385,16 +404,48 @@ class KoshaMSDSFetcher:
     BASE_URL = "http://apis.data.go.kr/B552468/msdsInfoService"
 
     def __init__(self, api_key: str = None):
-        self.api_key = api_key
+        self.api_key = api_key or get_kosha_api_key()
         self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'MSDS-Manager/1.0'
+        })
 
     def set_api_key(self, api_key: str):
         """API 키 설정"""
         self.api_key = api_key
 
+    def _parse_xml_response(self, xml_text: str) -> List[Dict]:
+        """XML 응답을 파싱하여 딕셔너리 리스트로 변환"""
+        results = []
+        try:
+            root = ET.fromstring(xml_text)
+
+            # 에러 체크
+            result_code = root.find('.//resultCode')
+            if result_code is not None and result_code.text != '00':
+                result_msg = root.find('.//resultMsg')
+                print(f"KOSHA API 에러: {result_msg.text if result_msg is not None else 'Unknown error'}")
+                return []
+
+            # items 파싱
+            items = root.findall('.//item')
+            for item in items:
+                item_dict = {}
+                for child in item:
+                    item_dict[child.tag] = child.text
+                results.append(item_dict)
+
+        except ET.ParseError as e:
+            print(f"XML 파싱 오류: {e}")
+        except Exception as e:
+            print(f"응답 처리 오류: {e}")
+
+        return results
+
     def search_by_cas(self, cas_number: str) -> List[Dict]:
         """CAS 번호로 MSDS 검색"""
         if not self.api_key:
+            print("KOSHA API 키가 설정되지 않았습니다.")
             return []
 
         try:
@@ -405,11 +456,9 @@ class KoshaMSDSFetcher:
                 'numOfRows': 10,
                 'pageNo': 1
             }
-            response = self.session.get(url, params=params, timeout=10)
+            response = self.session.get(url, params=params, timeout=15)
             if response.status_code == 200:
-                # XML 또는 JSON 파싱 필요
-                # 실제 구현 시 응답 형식에 맞게 파싱
-                return []
+                return self._parse_xml_response(response.text)
         except Exception as e:
             print(f"KOSHA API 오류: {e}")
         return []
@@ -417,6 +466,7 @@ class KoshaMSDSFetcher:
     def search_by_name(self, name: str) -> List[Dict]:
         """화학물질명으로 MSDS 검색"""
         if not self.api_key:
+            print("KOSHA API 키가 설정되지 않았습니다.")
             return []
 
         try:
@@ -427,12 +477,89 @@ class KoshaMSDSFetcher:
                 'numOfRows': 10,
                 'pageNo': 1
             }
-            response = self.session.get(url, params=params, timeout=10)
+            response = self.session.get(url, params=params, timeout=15)
             if response.status_code == 200:
-                return []
+                return self._parse_xml_response(response.text)
         except Exception as e:
             print(f"KOSHA API 오류: {e}")
         return []
+
+    def get_msds_detail(self, msds_no: str) -> Dict[str, Any]:
+        """MSDS 상세 정보 조회"""
+        if not self.api_key:
+            return {}
+
+        try:
+            url = f"{self.BASE_URL}/getMsdsDetailInfo"
+            params = {
+                'serviceKey': self.api_key,
+                'msdsNo': msds_no
+            }
+            response = self.session.get(url, params=params, timeout=15)
+            if response.status_code == 200:
+                items = self._parse_xml_response(response.text)
+                return items[0] if items else {}
+        except Exception as e:
+            print(f"KOSHA 상세 조회 오류: {e}")
+        return {}
+
+    def extract_physical_properties(self, detail: Dict) -> Dict[str, str]:
+        """KOSHA 데이터에서 물리화학적 특성 추출"""
+        result = {
+            '외관': detail.get('appearance', ''),
+            '냄새': detail.get('odor', ''),
+            'pH': detail.get('ph', ''),
+            '녹는점': detail.get('meltingPoint', ''),
+            '끓는점': detail.get('boilingPoint', ''),
+            '인화점': detail.get('flashPoint', ''),
+            '증기압': detail.get('vaporPressure', ''),
+            '용해도': detail.get('solubility', ''),
+            '비중': detail.get('specificGravity', ''),
+            '분자량': detail.get('molecularWeight', ''),
+            '옥탄올_물분배계수': detail.get('partitionCoefficient', ''),
+            '자연발화온도': detail.get('autoIgnitionTemp', ''),
+            '분해온도': detail.get('decompositionTemp', ''),
+            '점도': detail.get('viscosity', '')
+        }
+        return result
+
+    def extract_toxicity_data(self, detail: Dict) -> Dict[str, Any]:
+        """KOSHA 데이터에서 독성 정보 추출"""
+        result = {
+            '급성독성': {
+                '경구': detail.get('acuteToxicityOral', ''),
+                '경피': detail.get('acuteToxicityDermal', ''),
+                '흡입': detail.get('acuteToxicityInhalation', '')
+            },
+            '피부부식성_자극성': detail.get('skinCorrosion', ''),
+            '심한눈손상_자극성': detail.get('eyeDamage', ''),
+            '호흡기과민성': detail.get('respiratorySensitization', ''),
+            '피부과민성': detail.get('skinSensitization', ''),
+            '생식세포변이원성': detail.get('germCellMutagenicity', ''),
+            '발암성': detail.get('carcinogenicity', ''),
+            '생식독성': detail.get('reproductiveToxicity', ''),
+            '특정표적장기독성_1회': detail.get('stotSingle', ''),
+            '특정표적장기독성_반복': detail.get('stotRepeated', ''),
+            '흡인유해성': detail.get('aspirationHazard', ''),
+            '기타정보': []
+        }
+        return result
+
+    def extract_ecological_data(self, detail: Dict) -> Dict[str, Any]:
+        """KOSHA 데이터에서 환경 영향 정보 추출"""
+        result = {
+            '수생생태독성': {
+                '어류': detail.get('fishToxicity', ''),
+                '갑각류': detail.get('crustaceanToxicity', ''),
+                '조류': detail.get('algaeToxicity', '')
+            },
+            '잔류성_분해성': detail.get('persistence', ''),
+            '생물농축성': detail.get('bioaccumulation', ''),
+            '토양이동성': detail.get('soilMobility', ''),
+            '기타유해영향': [],
+            '오존층유해성': detail.get('ozoneDepletion', '')
+        }
+        return result
 
 
 class ChemicalDataFetcher:
@@ -445,29 +572,90 @@ class ChemicalDataFetcher:
         self.pubchem = PubChemFetcher()
         self.kosha = KoshaMSDSFetcher(kosha_api_key)
 
-    def fetch_data(self, identifier: str, search_type: str = 'cas') -> Dict[str, Any]:
+    def fetch_data(self, identifier: str, search_type: str = 'cas',
+                   prefer_kosha: bool = False) -> Dict[str, Any]:
         """
         화학물질 데이터 조회
 
         Args:
             identifier: CAS 번호 또는 화학물질명
             search_type: 'cas' 또는 'name'
+            prefer_kosha: KOSHA 데이터 우선 사용 여부
 
         Returns:
             통합 데이터 결과
         """
-        # 우선 PubChem에서 조회
-        result = self.pubchem.fetch_all_data(identifier, search_type)
+        result = {
+            'success': False,
+            'source': None,
+            'physical_properties': {},
+            'toxicity': {},
+            'ecological': {}
+        }
 
-        # KOSHA API 키가 있으면 추가 데이터 병합 (추후 구현)
+        # KOSHA API 시도 (API 키가 있는 경우)
         if self.kosha.api_key:
-            # KOSHA 데이터 조회 및 병합 로직
-            pass
+            if search_type == 'cas':
+                kosha_results = self.kosha.search_by_cas(identifier)
+            else:
+                kosha_results = self.kosha.search_by_name(identifier)
+
+            if kosha_results:
+                # 첫 번째 결과의 상세 정보 조회
+                msds_no = kosha_results[0].get('msdsNo')
+                if msds_no:
+                    detail = self.kosha.get_msds_detail(msds_no)
+                    if detail:
+                        result['success'] = True
+                        result['source'] = 'KOSHA'
+                        result['physical_properties'] = self.kosha.extract_physical_properties(detail)
+                        result['toxicity'] = self.kosha.extract_toxicity_data(detail)
+                        result['ecological'] = self.kosha.extract_ecological_data(detail)
+
+                        if prefer_kosha:
+                            return result
+
+        # PubChem에서 조회
+        pubchem_result = self.pubchem.fetch_all_data(identifier, search_type)
+
+        if pubchem_result.get('success'):
+            if not result['success']:
+                # KOSHA 데이터가 없으면 PubChem 사용
+                result = pubchem_result
+            else:
+                # KOSHA 데이터가 있으면 빈 필드만 PubChem으로 보완
+                for key in ['physical_properties', 'toxicity', 'ecological']:
+                    if key in pubchem_result:
+                        self._merge_data(result.get(key, {}), pubchem_result[key])
+                result['source'] = 'KOSHA + PubChem'
 
         return result
 
+    def _merge_data(self, target: Dict, source: Dict):
+        """빈 필드만 source에서 target으로 병합"""
+        for key, value in source.items():
+            if key not in target or not target[key]:
+                target[key] = value
+            elif isinstance(value, dict) and isinstance(target.get(key), dict):
+                self._merge_data(target[key], value)
+
     def get_section9_data(self, identifier: str, search_type: str = 'cas') -> Dict[str, str]:
         """섹션 9 물리화학적 특성 데이터만 조회"""
+        # 먼저 KOSHA 시도
+        if self.kosha.api_key:
+            if search_type == 'cas':
+                kosha_results = self.kosha.search_by_cas(identifier)
+            else:
+                kosha_results = self.kosha.search_by_name(identifier)
+
+            if kosha_results:
+                msds_no = kosha_results[0].get('msdsNo')
+                if msds_no:
+                    detail = self.kosha.get_msds_detail(msds_no)
+                    if detail:
+                        return self.kosha.extract_physical_properties(detail)
+
+        # PubChem fallback
         if search_type == 'cas':
             cid = self.pubchem.search_by_cas(identifier)
         else:
@@ -479,6 +667,21 @@ class ChemicalDataFetcher:
 
     def get_section11_data(self, identifier: str, search_type: str = 'cas') -> Dict[str, Any]:
         """섹션 11 독성 정보 데이터만 조회"""
+        # 먼저 KOSHA 시도
+        if self.kosha.api_key:
+            if search_type == 'cas':
+                kosha_results = self.kosha.search_by_cas(identifier)
+            else:
+                kosha_results = self.kosha.search_by_name(identifier)
+
+            if kosha_results:
+                msds_no = kosha_results[0].get('msdsNo')
+                if msds_no:
+                    detail = self.kosha.get_msds_detail(msds_no)
+                    if detail:
+                        return self.kosha.extract_toxicity_data(detail)
+
+        # PubChem fallback
         if search_type == 'cas':
             cid = self.pubchem.search_by_cas(identifier)
         else:
@@ -490,6 +693,21 @@ class ChemicalDataFetcher:
 
     def get_section12_data(self, identifier: str, search_type: str = 'cas') -> Dict[str, Any]:
         """섹션 12 환경 영향 데이터만 조회"""
+        # 먼저 KOSHA 시도
+        if self.kosha.api_key:
+            if search_type == 'cas':
+                kosha_results = self.kosha.search_by_cas(identifier)
+            else:
+                kosha_results = self.kosha.search_by_name(identifier)
+
+            if kosha_results:
+                msds_no = kosha_results[0].get('msdsNo')
+                if msds_no:
+                    detail = self.kosha.get_msds_detail(msds_no)
+                    if detail:
+                        return self.kosha.extract_ecological_data(detail)
+
+        # PubChem fallback
         if search_type == 'cas':
             cid = self.pubchem.search_by_cas(identifier)
         else:
@@ -505,5 +723,6 @@ if __name__ == "__main__":
     fetcher = ChemicalDataFetcher()
 
     # 벤젠(CAS: 71-43-2) 테스트
+    print("=== PubChem 테스트 ===")
     result = fetcher.fetch_data("71-43-2", "cas")
     print(json.dumps(result, indent=2, ensure_ascii=False))
