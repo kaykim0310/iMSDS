@@ -184,9 +184,9 @@ sections = [
     {
         'number': 9,
         'title': '물리화학적 특성',
-        'file': 'pages/9_물리화학적특성.py pages/09_물리화학적_특성.py',
+        'file': 'pages/09_9_물리화학적_특성9_.py',
         'key': 'section9_data',
-        'description': '물리적 상태, 화학적 특성'
+        'description': '물리적 상태, 화학적 특성 (PubChem 연동)'
     },
     {
         'number': 10,
@@ -198,16 +198,16 @@ sections = [
     {
         'number': 11,
         'title': '독성에 관한 정보',
-        'file': 'section11.py',
+        'file': 'pages/11_11_독성에_관한_정보.py',
         'key': 'section11_data',
-        'description': '독성 정보'
+        'description': '독성 정보 (PubChem/KOSHA 연동)'
     },
     {
         'number': 12,
         'title': '환경에 미치는 영향',
-        'file': 'section12.py',
+        'file': 'pages/12_12_환경에_미치는_영향.py',
         'key': 'section12_data',
-        'description': '환경 영향'
+        'description': '환경 영향 (PubChem/eChemPortal 연동)'
     },
     {
         'number': 13,
