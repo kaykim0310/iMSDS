@@ -244,7 +244,4 @@ with st.expander("저장된 데이터 확인"):
     if st.session_state.section3_data['components']:
         # DataFrame으로 표시
         df_display = pd.DataFrame(st.session_state.section3_data['components'])
-        st.dataframe(df_display, use_container_width=True)
-        
-        # JSON 형태로도 표시
-        st.json(st.session_state.section3_data)
+        st.table(df_display)
