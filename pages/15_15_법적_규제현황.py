@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.kosha_api import (
     KoshaApiClient,
     cached_regulation_lookup,
-    get_demo_regulation_data,
     validate_cas_number
 )
 
@@ -132,7 +131,8 @@ with st.sidebar:
     if api_key:
         st.session_state.kosha_api_key = api_key
 
-    st.info("API 키가 없으면 데모 데이터로 조회됩니다.")
+    st.warning("규제정보 조회를 위해 API 키가 필요합니다.")
+    st.markdown("[공공데이터포털에서 API 키 발급받기](https://www.data.go.kr)")
 
 # 조회할 물질 선택
 col_api1, col_api2 = st.columns([3, 1])

@@ -7,7 +7,7 @@ import os
 
 # utils 경로 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.kosha_api import validate_cas_number, get_demo_regulation_data
+from utils.kosha_api import validate_cas_number
 
 # 페이지 설정
 st.set_page_config(
