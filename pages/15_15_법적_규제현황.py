@@ -123,16 +123,16 @@ st.markdown("### KOSHA API 규제물질 자동 조회")
 with st.sidebar:
     st.markdown("### API 설정")
     api_key = st.text_input(
-        "KOSHA API 키",
+        "KOSHA API 키 (선택)",
         value=st.session_state.get('kosha_api_key', ''),
         type="password",
-        help="공공데이터포털(data.go.kr)에서 발급받은 API 키를 입력하세요."
+        help="별도의 API 키가 있으면 입력하세요. 비워두면 기본 키가 사용됩니다."
     )
     if api_key:
         st.session_state.kosha_api_key = api_key
 
-    st.warning("규제정보 조회를 위해 API 키가 필요합니다.")
-    st.markdown("[공공데이터포털에서 API 키 발급받기](https://www.data.go.kr)")
+    st.success("KOSHA MSDS API 연동 완료")
+    st.caption("https://msds.kosha.or.kr 데이터를 조회합니다.")
 
 # 조회할 물질 선택
 col_api1, col_api2 = st.columns([3, 1])
