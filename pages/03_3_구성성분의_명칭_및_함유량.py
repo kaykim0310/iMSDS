@@ -2,6 +2,12 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import io
+import sys
+import os
+
+# utils 경로 추가
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.kosha_api import validate_cas_number, get_demo_regulation_data
 
 # 페이지 설정
 st.set_page_config(
@@ -74,7 +80,7 @@ with button_col2:
 st.markdown("### 구성성분 정보")
 
 # 헤더
-header_cols = st.columns([2, 2, 2, 1])
+header_cols = st.columns([2, 2, 2, 1, 0.5])
 with header_cols[0]:
     st.markdown("**물질명**")
 with header_cols[1]:
@@ -83,14 +89,20 @@ with header_cols[2]:
     st.markdown("**CAS번호**")
 with header_cols[3]:
     st.markdown("**함유량(%)**")
+with header_cols[4]:
+    st.markdown("**검증**")
 
 # 구분선
 st.markdown("---")
 
+# CAS 번호 검증 결과 저장
+if 'cas_validation_results' not in st.session_state:
+    st.session_state.cas_validation_results = {}
+
 # 각 성분에 대한 입력 필드
 for idx, component in enumerate(st.session_state.section3_data['components']):
-    cols = st.columns([2, 2, 2, 1])
-    
+    cols = st.columns([2, 2, 2, 1, 0.5])
+
     with cols[0]:
         component['물질명'] = st.text_input(
             f"물질명 {idx+1}",
@@ -98,7 +110,7 @@ for idx, component in enumerate(st.session_state.section3_data['components']):
             key=f"material_{idx}",
             label_visibility="collapsed"
         )
-    
+
     with cols[1]:
         component['관용명(이명)'] = st.text_input(
             f"관용명 {idx+1}",
@@ -106,16 +118,22 @@ for idx, component in enumerate(st.session_state.section3_data['components']):
             key=f"common_name_{idx}",
             label_visibility="collapsed"
         )
-    
+
     with cols[2]:
-        component['CAS번호'] = st.text_input(
+        cas_value = st.text_input(
             f"CAS번호 {idx+1}",
             value=component['CAS번호'],
             key=f"cas_{idx}",
             placeholder="예: 7732-18-5",
             label_visibility="collapsed"
         )
-    
+        component['CAS번호'] = cas_value
+
+        # CAS 번호 실시간 검증
+        if cas_value and cas_value.strip():
+            is_valid = validate_cas_number(cas_value.strip())
+            st.session_state.cas_validation_results[idx] = is_valid
+
     with cols[3]:
         component['함유량(%)'] = st.text_input(
             f"함유량 {idx+1}",
@@ -124,6 +142,27 @@ for idx, component in enumerate(st.session_state.section3_data['components']):
             placeholder="예: 10-20",
             label_visibility="collapsed"
         )
+
+    with cols[4]:
+        # CAS 번호 검증 결과 표시
+        cas_val = component.get('CAS번호', '').strip()
+        if cas_val:
+            if st.session_state.cas_validation_results.get(idx, False):
+                st.markdown("✅")
+            else:
+                st.markdown("⚠️")
+
+# CAS 번호 검증 결과 요약
+invalid_cas_indices = []
+for idx, component in enumerate(st.session_state.section3_data['components']):
+    cas_val = component.get('CAS번호', '').strip()
+    if cas_val and not st.session_state.cas_validation_results.get(idx, False):
+        invalid_cas_indices.append((idx + 1, cas_val))
+
+if invalid_cas_indices:
+    invalid_list = ", ".join([f"#{idx} ({cas})" for idx, cas in invalid_cas_indices])
+    st.warning(f"⚠️ 다음 CAS 번호의 형식이 올바르지 않습니다: {invalid_list}")
+    st.caption("CAS 번호는 'XXXXX-XX-X' 형식이며, 마지막 숫자는 체크섬입니다.")
 
 # 합계 계산 (함유량이 단일 숫자인 경우에만)
 st.markdown("---")
@@ -138,7 +177,7 @@ try:
                 total += val
             except:
                 pass
-    
+
     if valid_percentages:
         st.info(f"📊 입력된 함유량 합계: {total:.1f}%")
         if abs(total - 100) > 0.1:

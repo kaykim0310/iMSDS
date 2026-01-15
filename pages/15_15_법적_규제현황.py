@@ -1,6 +1,17 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import sys
+import os
+
+# utils 경로 추가
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.kosha_api import (
+    KoshaApiClient,
+    cached_regulation_lookup,
+    get_demo_regulation_data,
+    validate_cas_number
+)
 
 # 페이지 설정
 st.set_page_config(
@@ -104,6 +115,133 @@ if 'section3_data' in st.session_state:
 if not materials:
     st.warning("⚠️ 섹션 3에서 구성성분 정보를 먼저 입력해주세요.")
     materials = [{'물질명': '예시물질', 'CAS번호': '1234-56-7', '함유량': '10-20'}]  # 예시용
+
+# KOSHA API 연동 섹션
+st.markdown("---")
+st.markdown("### KOSHA API 규제물질 자동 조회")
+
+# API 키 설정 (사이드바)
+with st.sidebar:
+    st.markdown("### API 설정")
+    api_key = st.text_input(
+        "KOSHA API 키",
+        value=st.session_state.get('kosha_api_key', ''),
+        type="password",
+        help="공공데이터포털(data.go.kr)에서 발급받은 API 키를 입력하세요."
+    )
+    if api_key:
+        st.session_state.kosha_api_key = api_key
+
+    st.info("API 키가 없으면 데모 데이터로 조회됩니다.")
+
+# 조회할 물질 선택
+col_api1, col_api2 = st.columns([3, 1])
+with col_api1:
+    selected_cas = st.selectbox(
+        "조회할 물질 선택",
+        options=[f"{m['물질명']} (CAS: {m['CAS번호']})" for m in materials if m['CAS번호']],
+        help="CAS 번호가 있는 물질만 조회 가능합니다."
+    )
+
+with col_api2:
+    st.markdown("<br>", unsafe_allow_html=True)
+    search_button = st.button("규제정보 조회", type="primary", use_container_width=True)
+
+# API 조회 결과 상태
+if 'api_search_results' not in st.session_state:
+    st.session_state.api_search_results = {}
+
+# 조회 실행
+if search_button and selected_cas:
+    # CAS 번호 추출
+    import re
+    cas_match = re.search(r'CAS:\s*([0-9-]+)', selected_cas)
+    if cas_match:
+        cas_number = cas_match.group(1)
+
+        # CAS 번호 형식 검증
+        if not validate_cas_number(cas_number):
+            st.warning(f"⚠️ CAS 번호 형식이 올바르지 않습니다: {cas_number}")
+        else:
+            with st.spinner(f"'{cas_number}' 규제정보 조회 중..."):
+                api_key_to_use = st.session_state.get('kosha_api_key', '')
+                result = cached_regulation_lookup(cas_number, api_key_to_use)
+                st.session_state.api_search_results[cas_number] = result
+
+# 조회 결과 표시
+if st.session_state.api_search_results:
+    st.markdown("#### 조회 결과")
+
+    for cas_num, result in st.session_state.api_search_results.items():
+        with st.expander(f"CAS {cas_num} 규제정보", expanded=True):
+            if 'error' in result and not result.get('산업안전보건법'):
+                st.error(result['error'])
+            else:
+                # 물질명 표시
+                if result.get('물질명'):
+                    st.markdown(f"**물질명:** {result['물질명']}")
+
+                col_result1, col_result2 = st.columns(2)
+
+                with col_result1:
+                    st.markdown("**산업안전보건법**")
+                    if '산업안전보건법' in result:
+                        for 항목, 상태 in result['산업안전보건법'].items():
+                            if isinstance(상태, bool):
+                                상태_text = "해당" if 상태 else "해당없음"
+                            else:
+                                상태_text = str(상태)
+
+                            if "해당없음" not in 상태_text and 상태_text not in ["False", ""]:
+                                st.markdown(f"- {항목}: **{상태_text}**")
+                            else:
+                                st.markdown(f"- {항목}: {상태_text}")
+
+                with col_result2:
+                    st.markdown("**화학물질관리법**")
+                    if '화학물질관리법' in result:
+                        for 항목, 상태 in result['화학물질관리법'].items():
+                            if isinstance(상태, bool):
+                                상태_text = "해당" if 상태 else "해당없음"
+                            else:
+                                상태_text = str(상태)
+
+                            if "해당없음" not in 상태_text and 상태_text not in ["False", ""]:
+                                st.markdown(f"- {항목}: **{상태_text}**")
+                            else:
+                                st.markdown(f"- {항목}: {상태_text}")
+
+                # 결과 자동 적용 버튼
+                if st.button(f"조회 결과 자동 적용", key=f"apply_{cas_num}"):
+                    # 산업안전보건법 데이터 적용
+                    if '산업안전보건법' in result:
+                        for 항목, 상태 in result['산업안전보건법'].items():
+                            if 항목 in st.session_state.section15_data['가_산업안전보건법']:
+                                if isinstance(상태, bool):
+                                    결론값 = "해당" if 상태 else "해당없음"
+                                else:
+                                    결론값 = str(상태) if 상태 else "해당없음"
+                                st.session_state.section15_data['가_산업안전보건법'][항목]['결론'] = 결론값
+
+                    # 화학물질관리법 데이터 적용
+                    if '화학물질관리법' in result:
+                        for 항목, 상태 in result['화학물질관리법'].items():
+                            if 항목 in st.session_state.section15_data['나_화학물질관리법']:
+                                if isinstance(상태, bool):
+                                    결론값 = "해당" if 상태 else "해당없음"
+                                else:
+                                    결론값 = str(상태) if 상태 else "해당없음"
+                                st.session_state.section15_data['나_화학물질관리법'][항목]['결론'] = 결론값
+
+                    st.success(f"✅ CAS {cas_num} 규제정보가 자동 적용되었습니다!")
+                    st.rerun()
+
+    # 조회 결과 초기화 버튼
+    if st.button("조회 결과 초기화"):
+        st.session_state.api_search_results = {}
+        st.rerun()
+
+st.markdown("---")
 
 # 가. 산업안전보건법에 의한 규제
 st.markdown('<div class="subsection-header">가. 산업안전보건법에 의한 규제</div>', unsafe_allow_html=True)
@@ -384,7 +522,8 @@ st.info("""
 - 각 법규별 해당 여부는 관련 부처 고시를 확인하세요.
 - 해당사항이 없는 경우 "해당없음"으로 기재하세요.
 - 화학물질정보시스템(https://icis.me.go.kr) 등을 참조할 수 있습니다.
-- 추후 데이터베이스 연동을 통해 자동 조회 기능이 추가될 예정입니다.
+- **KOSHA API 연동 기능:** 상단의 '규제정보 조회' 버튼을 통해 자동으로 규제 정보를 조회할 수 있습니다.
+- API 키는 [공공데이터포털](https://www.data.go.kr)에서 발급받을 수 있습니다.
 """)
 
 # 저장 버튼

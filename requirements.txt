@@ -8,4 +8,7 @@ openpyxl>=3.0.0
 xlsxwriter>=3.0.0
 python-docx>=0.8.11
 
+# HTTP requests
+requests>=2.28.0
+
 # 최소 필수 패키지만 포함 (Streamlit Cloud용)
