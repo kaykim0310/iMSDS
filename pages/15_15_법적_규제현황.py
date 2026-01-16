@@ -1,0 +1,291 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import sys
+import os
+
+# 페이지 설정
+st.set_page_config(
+    page_title="MSDS 섹션 15 - 법적 규제현황",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# 스타일 적용
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap');
+    
+    * {
+        font-family: 'Nanum Gothic', sans-serif !important;
+    }
+    
+    .stTextInput > div > div > input {
+        background-color: #f0f0f0;
+        font-family: 'Nanum Gothic', sans-serif !important;
+    }
+    .stTextArea > div > div > textarea {
+        background-color: #f0f0f0;
+        font-family: 'Nanum Gothic', sans-serif !important;
+    }
+    .section-header {
+        background-color: #d3e3f3;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        font-family: 'Nanum Gothic', sans-serif !important;
+    }
+    .subsection-header {
+        background-color: #e8f0f7;
+        padding: 8px;
+        border-radius: 3px;
+        margin: 15px 0;
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 제목
+st.markdown('<div class="section-header"><h2>15. 법적 규제현황</h2></div>', unsafe_allow_html=True)
+
+# 세션 상태 초기화 (공식 양식 기준)
+if 'section15_data' not in st.session_state:
+    st.session_state.section15_data = {
+        '가_산업안전보건법에_의한_규제': '',
+        '나_화학물질관리법에_의한_규제': '',
+        '다_화학물질의_등록_및_평가_등에_관한_법률에_의한_규제': '',
+        '라_위험물안전관리법에_의한_규제': '',
+        '마_폐기물관리법에_의한_규제': '',
+        '바_기타_국내_및_외국법에_의한_규제': ''
+    }
+
+# ============================================================
+# KOSHA API 연동 섹션
+# ============================================================
+with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
+    st.markdown("섹션 3에 등록된 CAS 번호로 법적 규제현황을 자동 조회합니다.")
+    
+    # 섹션 3에서 CAS 번호 가져오기
+    cas_list = []
+    materials_info = []
+    
+    if 'section3_data' in st.session_state:
+        for comp in st.session_state.get('section3_data', {}).get('components', []):
+            if comp.get('CAS번호') and comp.get('물질명'):
+                cas_list.append(comp['CAS번호'])
+                materials_info.append({
+                    'name': comp['물질명'],
+                    'cas': comp['CAS번호'],
+                    'content': comp.get('함유량(%)', '')
+                })
+    
+    if cas_list:
+        st.success(f"✅ 섹션 3에서 {len(cas_list)}개의 CAS 번호를 찾았습니다.")
+        for mat in materials_info:
+            st.write(f"  • **{mat['name']}** (CAS: {mat['cas']})")
+        
+        if st.button("🔍 KOSHA API에서 법적 규제현황 조회", type="primary", key="api_query_btn"):
+            try:
+                # 프로젝트 루트에 kosha_api_extended.py 파일이 있어야 합니다
+                import sys
+                import os
+                # 현재 파일의 상위 디렉토리(프로젝트 루트)를 path에 추가
+                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                from kosha_api_extended import get_legal_regulations, search_by_cas
+                import time
+                
+                with st.spinner("KOSHA API에서 데이터를 조회 중입니다..."):
+                    api_results = []
+                    
+                    for cas in cas_list:
+                        search_result = search_by_cas(cas)
+                        if search_result.get('success'):
+                            chem_id = search_result['chemId']
+                            name = search_result.get('chemNameKor', cas)
+                            time.sleep(0.3)
+                            regulations = get_legal_regulations(chem_id)
+                            api_results.append({
+                                'cas': cas,
+                                'name': name,
+                                'regulations': regulations
+                            })
+                        else:
+                            api_results.append({
+                                'cas': cas,
+                                'name': cas,
+                                'error': search_result.get('error', '조회 실패')
+                            })
+                        time.sleep(0.3)
+                    
+                    st.session_state['section15_api_results'] = api_results
+                    st.rerun()
+                    
+            except ImportError:
+                st.error("❌ kosha_api_extended.py 모듈을 찾을 수 없습니다.")
+            except Exception as e:
+                st.error(f"❌ API 조회 중 오류: {e}")
+    else:
+        st.warning("⚠️ 섹션 3에 CAS 번호가 등록된 구성성분이 없습니다.")
+    
+    # API 결과 표시
+    if 'section15_api_results' in st.session_state:
+        st.markdown("---")
+        st.markdown("**📊 조회 결과:**")
+        
+        for result in st.session_state['section15_api_results']:
+            if 'error' in result:
+                st.warning(f"⚠️ {result['cas']}: {result['error']}")
+            else:
+                st.info(f"✅ **{result['name']}** (CAS: {result['cas']}) - 조회 완료")
+        
+        st.markdown("*위 정보를 참고하여 아래 양식을 작성하세요.*")
+
+st.markdown("---")
+
+# ============================================================
+# 공식 양식 기준 입력 필드
+# ============================================================
+
+# 가. 산업안전보건법에 의한 규제
+st.markdown('<div class="subsection-header">가. 산업안전보건법에 의한 규제</div>', unsafe_allow_html=True)
+
+가_내용 = st.text_area(
+    "산업안전보건법에 의한 규제",
+    value=st.session_state.section15_data.get('가_산업안전보건법에_의한_규제', ''),
+    height=150,
+    placeholder="""예:
+• 작업환경측정대상물질: 해당 (TWA: 100 ppm)
+• 관리대상유해물질: 해당
+• 특수건강진단대상물질: 해당
+• 노출기준설정물질: 해당
+• 허가대상물질: 해당없음
+• 제조등금지물질: 해당없음""",
+    key="occupational_safety_law",
+    label_visibility="collapsed"
+)
+st.session_state.section15_data['가_산업안전보건법에_의한_규제'] = 가_내용
+
+# 나. 화학물질관리법에 의한 규제
+st.markdown('<div class="subsection-header">나. 화학물질관리법에 의한 규제</div>', unsafe_allow_html=True)
+
+나_내용 = st.text_area(
+    "화학물질관리법에 의한 규제",
+    value=st.session_state.section15_data.get('나_화학물질관리법에_의한_규제', ''),
+    height=150,
+    placeholder="""예:
+• 유독물질: 해당 (유독물질 고시번호: 97-1-xxx)
+• 허가물질: 해당없음
+• 제한물질: 해당없음
+• 금지물질: 해당없음
+• 사고대비물질: 해당 (지정수량: 1,000 kg)""",
+    key="chemical_control_law",
+    label_visibility="collapsed"
+)
+st.session_state.section15_data['나_화학물질관리법에_의한_규제'] = 나_내용
+
+# 다. 화학물질의 등록 및 평가 등에 관한 법률에 의한 규제
+st.markdown('<div class="subsection-header">다. 화학물질의 등록 및 평가 등에 관한 법률에 의한 규제</div>', unsafe_allow_html=True)
+
+다_내용 = st.text_area(
+    "화학물질의 등록 및 평가 등에 관한 법률에 의한 규제",
+    value=st.session_state.section15_data.get('다_화학물질의_등록_및_평가_등에_관한_법률에_의한_규제', ''),
+    height=100,
+    placeholder="""예:
+• 기존화학물질: 해당 (KE-xxxxx)
+• 등록대상기존화학물질: 해당없음
+• 중점관리물질: 해당없음""",
+    key="chemical_registration_law",
+    label_visibility="collapsed"
+)
+st.session_state.section15_data['다_화학물질의_등록_및_평가_등에_관한_법률에_의한_규제'] = 다_내용
+
+# 라. 위험물안전관리법에 의한 규제
+st.markdown('<div class="subsection-header">라. 위험물안전관리법에 의한 규제</div>', unsafe_allow_html=True)
+
+라_내용 = st.text_area(
+    "위험물안전관리법에 의한 규제",
+    value=st.session_state.section15_data.get('라_위험물안전관리법에_의한_규제', ''),
+    height=100,
+    placeholder="""예:
+• 제4류 인화성액체, 제1석유류(비수용성액체), 지정수량: 200 L
+또는
+• 해당없음""",
+    key="hazardous_materials_law",
+    label_visibility="collapsed"
+)
+st.session_state.section15_data['라_위험물안전관리법에_의한_규제'] = 라_내용
+
+# 마. 폐기물관리법에 의한 규제
+st.markdown('<div class="subsection-header">마. 폐기물관리법에 의한 규제</div>', unsafe_allow_html=True)
+
+마_내용 = st.text_area(
+    "폐기물관리법에 의한 규제",
+    value=st.session_state.section15_data.get('마_폐기물관리법에_의한_규제', ''),
+    height=100,
+    placeholder="""예:
+• 지정폐기물: 해당 (폐유기용제류)
+또는
+• 해당없음""",
+    key="waste_management_law",
+    label_visibility="collapsed"
+)
+st.session_state.section15_data['마_폐기물관리법에_의한_규제'] = 마_내용
+
+# 바. 기타 국내 및 외국법에 의한 규제
+st.markdown('<div class="subsection-header">바. 기타 국내 및 외국법에 의한 규제</div>', unsafe_allow_html=True)
+
+바_내용 = st.text_area(
+    "기타 국내 및 외국법에 의한 규제",
+    value=st.session_state.section15_data.get('바_기타_국내_및_외국법에_의한_규제', ''),
+    height=150,
+    placeholder="""예:
+[국내법]
+• 잔류성유기오염물질 관리법: 해당없음
+
+[외국법]
+• 미국 OSHA 규정: 해당
+• 미국 CERCLA 규정: 해당없음
+• 로테르담 협약: 해당없음
+• 스톡홀름 협약: 해당없음
+• 몬트리올 의정서: 해당없음
+• EU CLP 규정: 해당 (H-문구, P-문구)""",
+    key="other_regulations",
+    label_visibility="collapsed"
+)
+st.session_state.section15_data['바_기타_국내_및_외국법에_의한_규제'] = 바_내용
+
+# 참고 안내
+st.info("""💡 **참고사항**
+- 각 법규별 해당 여부는 관련 부처 고시를 확인하세요.
+- 해당사항이 없는 경우 "해당없음"으로 기재하세요.
+- 화학물질정보시스템(https://icis.me.go.kr) 등을 참조할 수 있습니다.
+""")
+
+# 저장 버튼
+st.markdown("---")
+col1, col2, col3 = st.columns([1, 1, 1])
+with col2:
+    if st.button("섹션 15 저장", type="primary", use_container_width=True):
+        st.success("✅ 섹션 15가 저장되었습니다!")
+
+# 데이터 미리보기
+with st.expander("저장된 데이터 확인"):
+    st.write("### 15. 법적 규제현황")
+
+    항목들 = [
+        ("가. 산업안전보건법에 의한 규제", '가_산업안전보건법에_의한_규제'),
+        ("나. 화학물질관리법에 의한 규제", '나_화학물질관리법에_의한_규제'),
+        ("다. 화학물질의 등록 및 평가 등에 관한 법률에 의한 규제", '다_화학물질의_등록_및_평가_등에_관한_법률에_의한_규제'),
+        ("라. 위험물안전관리법에 의한 규제", '라_위험물안전관리법에_의한_규제'),
+        ("마. 폐기물관리법에 의한 규제", '마_폐기물관리법에_의한_규제'),
+        ("바. 기타 국내 및 외국법에 의한 규제", '바_기타_국내_및_외국법에_의한_규제')
+    ]
+
+    for 제목, 키 in 항목들:
+        내용 = st.session_state.section15_data.get(키, '')
+        st.write(f"**{제목}**")
+        st.text(내용 or '(미입력)')
+        st.write("")
+
+    st.write("### 원본 데이터")
+    st.json(st.session_state.section15_data)
