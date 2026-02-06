@@ -93,13 +93,20 @@ if isinstance(st.session_state.section11_data.get('나_건강_유해성_정보')
 # ============================================================
 # KOSHA API 연동 섹션
 # ============================================================
+import requests
+import xml.etree.ElementTree as ET
+import time
+
+KOSHA_API_KEY = "5002b52ede58ae3359d098a19d4e11ce7f88ffddc737233c2ebce75c033ff44a"
+KOSHA_BASE_URL = "https://msds.kosha.or.kr/openapi/service/msdschem"
+
 with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
     st.markdown("섹션 3에 등록된 CAS 번호로 독성 정보를 자동 조회합니다.")
-    
+
     # 섹션 3에서 CAS 번호 가져오기
     cas_list = []
     materials_info = []
-    
+
     if 'section3_data' in st.session_state:
         for comp in st.session_state.get('section3_data', {}).get('components', []):
             if comp.get('CAS번호') and comp.get('물질명'):
@@ -109,158 +116,173 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                     'cas': comp['CAS번호'],
                     'content': comp.get('함유량(%)', '')
                 })
-    
+
     if cas_list:
         st.success(f"✅ 섹션 3에서 {len(cas_list)}개의 CAS 번호를 찾았습니다.")
         for mat in materials_info:
             st.write(f"  • **{mat['name']}** (CAS: {mat['cas']})")
-        
+
         if st.button("🔍 KOSHA API에서 독성 정보 조회", type="primary", key="api_query_btn"):
             try:
-                import sys
-                import os
-                import importlib
-                import time
-                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                # 모듈 캐시 강제 리로드
-                import kosha_api_extended
-                importlib.reload(kosha_api_extended)
-                from kosha_api_extended import get_toxicity_info, search_by_cas
+                progress = st.empty()
+                api_results = []
 
-                with st.spinner("KOSHA API에서 데이터를 조회 중입니다..."):
-                    api_results = []
+                for idx, cas in enumerate(cas_list):
+                    progress.info(f"[{idx+1}/{len(cas_list)}] CAS {cas} 조회 중...")
 
-                    for cas in cas_list:
-                        search_result = search_by_cas(cas)
-                        if search_result.get('success'):
-                            chem_id = search_result['chemId']
-                            name = search_result.get('chemNameKor', cas)
-                            time.sleep(0.3)
-                            toxicity = get_toxicity_info(chem_id)
-                            api_results.append({
-                                'cas': cas,
-                                'name': name,
-                                'chemId': chem_id,
-                                'toxicity': toxicity
-                            })
-                        else:
-                            api_results.append({
-                                'cas': cas,
-                                'name': cas,
-                                'error': search_result.get('error', '조회 실패')
-                            })
-                        time.sleep(0.3)
+                    # 1단계: chemlist로 물질 검색
+                    resp1 = requests.get(f"{KOSHA_BASE_URL}/chemlist", params={
+                        "serviceKey": KOSHA_API_KEY,
+                        "searchWrd": cas,
+                        "searchCnd": 1,
+                        "numOfRows": 10,
+                        "pageNo": 1
+                    }, timeout=30)
 
-                    st.session_state['section11_api_results'] = api_results
+                    root1 = ET.fromstring(resp1.content)
+                    search_items = root1.findall(".//item")
 
-                    # 조회 즉시 폼에 자동 반영
-                    exposure_parts = []
-                    acute_parts = []
-                    skin_corrosion_parts = []
-                    eye_damage_parts = []
-                    resp_sens_parts = []
-                    skin_sens_parts = []
-                    carcino_parts = []
-                    mutagen_parts = []
-                    repro_parts = []
-                    stot_single_parts = []
-                    stot_repeated_parts = []
-                    aspiration_parts = []
+                    if not search_items:
+                        api_results.append({'cas': cas, 'name': cas, 'error': '물질 미등록'})
+                        continue
 
-                    for result in api_results:
-                        if 'error' in result:
-                            continue
-                        tox = result.get('toxicity', {})
-                        mat_name = result.get('name', result.get('cas', ''))
+                    chem_id = search_items[0].findtext("chemId", "")
+                    chem_name = search_items[0].findtext("chemNameKor", cas)
 
-                        def _val(v):
-                            return v if v and v != "자료없음" else ""
+                    time.sleep(0.3)
 
-                        if _val(tox.get('exposure_routes')):
-                            exposure_parts.append(f"[{mat_name}] {tox['exposure_routes']}")
+                    # 2단계: chemdetail11로 독성정보 조회
+                    resp2 = requests.get(f"{KOSHA_BASE_URL}/chemdetail11", params={
+                        "serviceKey": KOSHA_API_KEY,
+                        "chemId": chem_id,
+                        "numOfRows": 100,
+                        "pageNo": 1
+                    }, timeout=30)
 
-                        acute = tox.get('acute_toxicity', {})
-                        acute_lines = []
-                        if _val(acute.get('oral')):
-                            acute_lines.append(f"경구: {acute['oral']}")
-                        if _val(acute.get('dermal')):
-                            acute_lines.append(f"경피: {acute['dermal']}")
-                        if _val(acute.get('inhalation')):
-                            acute_lines.append(f"흡입: {acute['inhalation']}")
-                        if acute_lines:
-                            acute_parts.append(f"[{mat_name}] " + " / ".join(acute_lines))
+                    raw_xml = resp2.text[:3000]
+                    root2 = ET.fromstring(resp2.content)
+                    detail_items = root2.findall(".//item")
 
-                        if _val(tox.get('skin_corrosion')):
-                            skin_corrosion_parts.append(f"[{mat_name}] {tox['skin_corrosion']}")
-                        if _val(tox.get('eye_damage')):
-                            eye_damage_parts.append(f"[{mat_name}] {tox['eye_damage']}")
-                        if _val(tox.get('respiratory_sensitization')):
-                            resp_sens_parts.append(f"[{mat_name}] {tox['respiratory_sensitization']}")
-                        if _val(tox.get('skin_sensitization')):
-                            skin_sens_parts.append(f"[{mat_name}] {tox['skin_sensitization']}")
-                        if _val(tox.get('carcinogenicity')):
-                            carcino_parts.append(f"[{mat_name}] {tox['carcinogenicity']}")
-                        if _val(tox.get('germ_cell_mutagenicity')):
-                            mutagen_parts.append(f"[{mat_name}] {tox['germ_cell_mutagenicity']}")
-                        if _val(tox.get('reproductive_toxicity')):
-                            repro_parts.append(f"[{mat_name}] {tox['reproductive_toxicity']}")
-                        if _val(tox.get('stot_single')):
-                            stot_single_parts.append(f"[{mat_name}] {tox['stot_single']}")
-                        if _val(tox.get('stot_repeated')):
-                            stot_repeated_parts.append(f"[{mat_name}] {tox['stot_repeated']}")
-                        if _val(tox.get('aspiration_hazard')):
-                            aspiration_parts.append(f"[{mat_name}] {tox['aspiration_hazard']}")
-
-                    # 위젯 키와 데이터 딕셔너리 동시에 업데이트
-                    fill_map = {
-                        'exposure_routes': "\n".join(exposure_parts) if exposure_parts else "자료없음",
-                        'acute_toxicity': "\n".join(acute_parts) if acute_parts else "자료없음",
-                        'skin_corrosion': "\n".join(skin_corrosion_parts) if skin_corrosion_parts else "자료없음",
-                        'eye_damage': "\n".join(eye_damage_parts) if eye_damage_parts else "자료없음",
-                        'respiratory_sensitization': "\n".join(resp_sens_parts) if resp_sens_parts else "자료없음",
-                        'skin_sensitization': "\n".join(skin_sens_parts) if skin_sens_parts else "자료없음",
-                        'carcinogenicity': "\n".join(carcino_parts) if carcino_parts else "자료없음",
-                        'germ_cell_mutagenicity': "\n".join(mutagen_parts) if mutagen_parts else "자료없음",
-                        'reproductive_toxicity': "\n".join(repro_parts) if repro_parts else "자료없음",
-                        'stot_single': "\n".join(stot_single_parts) if stot_single_parts else "자료없음",
-                        'stot_repeated': "\n".join(stot_repeated_parts) if stot_repeated_parts else "자료없음",
-                        'aspiration_hazard': "\n".join(aspiration_parts) if aspiration_parts else "자료없음",
+                    # 항목 파싱
+                    parsed = {
+                        'exposure_routes': '', 'skin_corrosion': '', 'eye_damage': '',
+                        'respiratory_sensitization': '', 'skin_sensitization': '',
+                        'carcinogenicity': '', 'germ_cell_mutagenicity': '',
+                        'reproductive_toxicity': '', 'stot_single': '', 'stot_repeated': '',
+                        'aspiration_hazard': '',
+                        'acute_oral': '', 'acute_dermal': '', 'acute_inhalation': '',
                     }
+                    raw_items = []
 
-                    # Streamlit 위젯 키 직접 업데이트 (이게 핵심!)
-                    st.session_state['exposure_routes'] = fill_map['exposure_routes']
-                    st.session_state['acute_toxicity'] = fill_map['acute_toxicity']
-                    st.session_state['skin_corrosion'] = fill_map['skin_corrosion']
-                    st.session_state['eye_damage'] = fill_map['eye_damage']
-                    st.session_state['respiratory_sensitization'] = fill_map['respiratory_sensitization']
-                    st.session_state['skin_sensitization'] = fill_map['skin_sensitization']
-                    st.session_state['carcinogenicity'] = fill_map['carcinogenicity']
-                    st.session_state['germ_cell_mutagenicity'] = fill_map['germ_cell_mutagenicity']
-                    st.session_state['reproductive_toxicity'] = fill_map['reproductive_toxicity']
-                    st.session_state['stot_single'] = fill_map['stot_single']
-                    st.session_state['stot_repeated'] = fill_map['stot_repeated']
-                    st.session_state['aspiration_hazard'] = fill_map['aspiration_hazard']
+                    for it in detail_items:
+                        name_kor = it.findtext("msdsItemNameKor", "")
+                        detail = it.findtext("itemDetail", "")
+                        if not detail or detail == "자료없음":
+                            detail = "자료없음"
+                        raw_items.append({"name": name_kor, "detail": detail})
 
-                    # 데이터 딕셔너리도 업데이트
-                    st.session_state.section11_data['가_가능성이_높은_노출_경로에_관한_정보'] = fill_map['exposure_routes']
-                    st.session_state.section11_data['나_건강_유해성_정보']['급성_독성'] = fill_map['acute_toxicity']
-                    st.session_state.section11_data['나_건강_유해성_정보']['피부_부식성_또는_자극성'] = fill_map['skin_corrosion']
-                    st.session_state.section11_data['나_건강_유해성_정보']['심한_눈_손상_또는_자극성'] = fill_map['eye_damage']
-                    st.session_state.section11_data['나_건강_유해성_정보']['호흡기_과민성'] = fill_map['respiratory_sensitization']
-                    st.session_state.section11_data['나_건강_유해성_정보']['피부_과민성'] = fill_map['skin_sensitization']
-                    st.session_state.section11_data['나_건강_유해성_정보']['발암성'] = fill_map['carcinogenicity']
-                    st.session_state.section11_data['나_건강_유해성_정보']['생식세포_변이원성'] = fill_map['germ_cell_mutagenicity']
-                    st.session_state.section11_data['나_건강_유해성_정보']['생식독성'] = fill_map['reproductive_toxicity']
-                    st.session_state.section11_data['나_건강_유해성_정보']['특정_표적장기_독성_1회_노출'] = fill_map['stot_single']
-                    st.session_state.section11_data['나_건강_유해성_정보']['특정_표적장기_독성_반복_노출'] = fill_map['stot_repeated']
-                    st.session_state.section11_data['나_건강_유해성_정보']['흡인_유해성'] = fill_map['aspiration_hazard']
+                        if "노출" in name_kor and "경로" in name_kor:
+                            parsed['exposure_routes'] = detail
+                        elif "급성" in name_kor and "독성" in name_kor:
+                            if "경구" in name_kor: parsed['acute_oral'] = detail
+                            elif "경피" in name_kor: parsed['acute_dermal'] = detail
+                            elif "흡입" in name_kor: parsed['acute_inhalation'] = detail
+                            elif not parsed['acute_oral']: parsed['acute_oral'] = detail
+                        elif "피부" in name_kor and ("부식" in name_kor or "자극" in name_kor) and "과민" not in name_kor:
+                            parsed['skin_corrosion'] = detail
+                        elif "눈" in name_kor and ("손상" in name_kor or "자극" in name_kor):
+                            parsed['eye_damage'] = detail
+                        elif "호흡기" in name_kor and "과민" in name_kor:
+                            parsed['respiratory_sensitization'] = detail
+                        elif "피부" in name_kor and "과민" in name_kor:
+                            parsed['skin_sensitization'] = detail
+                        elif "발암" in name_kor:
+                            parsed['carcinogenicity'] = detail
+                        elif "생식세포" in name_kor and "변이" in name_kor:
+                            parsed['germ_cell_mutagenicity'] = detail
+                        elif "생식독성" in name_kor:
+                            parsed['reproductive_toxicity'] = detail
+                        elif "특정" in name_kor and "표적" in name_kor and "장기" in name_kor:
+                            if "1회" in name_kor or "단일" in name_kor: parsed['stot_single'] = detail
+                            elif "반복" in name_kor: parsed['stot_repeated'] = detail
+                        elif "흡인" in name_kor and "유해" in name_kor:
+                            parsed['aspiration_hazard'] = detail
 
-                    st.rerun()
+                    api_results.append({
+                        'cas': cas, 'name': chem_name, 'chemId': chem_id,
+                        'parsed': parsed, 'raw_items': raw_items, 'raw_xml': raw_xml,
+                        'item_count': len(detail_items)
+                    })
+                    time.sleep(0.3)
 
-            except ImportError:
-                st.error("❌ kosha_api_extended.py 모듈을 찾을 수 없습니다.")
+                st.session_state['section11_api_results'] = api_results
+
+                # 즉시 폼에 반영
+                widget_fill = {
+                    'exposure_routes': '', 'acute_toxicity': '', 'skin_corrosion': '',
+                    'eye_damage': '', 'respiratory_sensitization': '', 'skin_sensitization': '',
+                    'carcinogenicity': '', 'germ_cell_mutagenicity': '', 'reproductive_toxicity': '',
+                    'stot_single': '', 'stot_repeated': '', 'aspiration_hazard': '',
+                }
+
+                for r in api_results:
+                    if 'error' in r:
+                        continue
+                    p = r['parsed']
+                    n = r['name']
+
+                    def _add(key, val):
+                        if val and val != "자료없음":
+                            widget_fill[key] += (f"[{n}] {val}\n" if widget_fill[key] else f"[{n}] {val}")
+
+                    _add('exposure_routes', p['exposure_routes'])
+                    acute_line = " / ".join(filter(None, [
+                        f"경구: {p['acute_oral']}" if p['acute_oral'] and p['acute_oral'] != "자료없음" else "",
+                        f"경피: {p['acute_dermal']}" if p['acute_dermal'] and p['acute_dermal'] != "자료없음" else "",
+                        f"흡입: {p['acute_inhalation']}" if p['acute_inhalation'] and p['acute_inhalation'] != "자료없음" else "",
+                    ]))
+                    _add('acute_toxicity', acute_line)
+                    _add('skin_corrosion', p['skin_corrosion'])
+                    _add('eye_damage', p['eye_damage'])
+                    _add('respiratory_sensitization', p['respiratory_sensitization'])
+                    _add('skin_sensitization', p['skin_sensitization'])
+                    _add('carcinogenicity', p['carcinogenicity'])
+                    _add('germ_cell_mutagenicity', p['germ_cell_mutagenicity'])
+                    _add('reproductive_toxicity', p['reproductive_toxicity'])
+                    _add('stot_single', p['stot_single'])
+                    _add('stot_repeated', p['stot_repeated'])
+                    _add('aspiration_hazard', p['aspiration_hazard'])
+
+                # 위젯 키 + 데이터 딕셔너리 동시 업데이트
+                for wkey, val in widget_fill.items():
+                    st.session_state[wkey] = val or "자료없음"
+
+                d = st.session_state.section11_data
+                d['가_가능성이_높은_노출_경로에_관한_정보'] = widget_fill['exposure_routes'] or "자료없음"
+                h = d['나_건강_유해성_정보']
+                h['급성_독성'] = widget_fill['acute_toxicity'] or "자료없음"
+                h['피부_부식성_또는_자극성'] = widget_fill['skin_corrosion'] or "자료없음"
+                h['심한_눈_손상_또는_자극성'] = widget_fill['eye_damage'] or "자료없음"
+                h['호흡기_과민성'] = widget_fill['respiratory_sensitization'] or "자료없음"
+                h['피부_과민성'] = widget_fill['skin_sensitization'] or "자료없음"
+                h['발암성'] = widget_fill['carcinogenicity'] or "자료없음"
+                h['생식세포_변이원성'] = widget_fill['germ_cell_mutagenicity'] or "자료없음"
+                h['생식독성'] = widget_fill['reproductive_toxicity'] or "자료없음"
+                h['특정_표적장기_독성_1회_노출'] = widget_fill['stot_single'] or "자료없음"
+                h['특정_표적장기_독성_반복_노출'] = widget_fill['stot_repeated'] or "자료없음"
+                h['흡인_유해성'] = widget_fill['aspiration_hazard'] or "자료없음"
+
+                progress.success("✅ 조회 완료! 폼에 자동 반영되었습니다.")
+                st.rerun()
+
+            except requests.RequestException as e:
+                st.error(f"❌ API 연결 오류: {e}")
+            except ET.ParseError as e:
+                st.error(f"❌ XML 파싱 오류: {e}")
             except Exception as e:
-                st.error(f"❌ API 조회 중 오류: {e}")
+                st.error(f"❌ 오류 발생: {e}")
+                import traceback
+                st.code(traceback.format_exc())
     else:
         st.warning("⚠️ 섹션 3에 CAS 번호가 등록된 구성성분이 없습니다.")
 
@@ -273,21 +295,16 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
             if 'error' in result:
                 st.warning(f"⚠️ {result['cas']}: {result['error']}")
             else:
-                tox = result.get('toxicity', {})
-                raw_items = tox.get('raw_items', [])
-                chem_id = result.get('chemId', '?')
-                debug_xml = tox.get('_debug_xml', '(없음)')
-                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']}, chemId: {chem_id}) - {len(raw_items)}개 항목", expanded=True):
+                cnt = result.get('item_count', 0)
+                with st.expander(f"**{result['name']}** (CAS: {result['cas']}, chemId: {result.get('chemId','?')}) - {cnt}개 항목"):
+                    raw_items = result.get('raw_items', [])
                     if raw_items:
                         for item in raw_items:
-                            iname = item.get('name', '')
-                            detail = item.get('detail', '자료없음')
-                            st.markdown(f"- **{iname}**: {detail}")
+                            st.markdown(f"- **{item['name']}**: {item['detail']}")
                     else:
-                        st.error("⚠️ API에서 반환된 독성 항목이 0개입니다.")
-                    # 진단: API 원본 XML 확인
-                    with st.expander("🔧 API 원본 XML 응답 (진단용)"):
-                        st.code(debug_xml[:3000] if debug_xml else "(응답 없음)", language="xml")
+                        st.error(f"chemdetail11에서 반환된 항목이 0개입니다.")
+                    with st.expander("원본 XML"):
+                        st.code(result.get('raw_xml', '(없음)'), language="xml")
 
 st.markdown("---")
 
