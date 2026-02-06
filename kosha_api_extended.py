@@ -136,7 +136,12 @@ def get_toxicity_info(chem_id: str) -> Dict[str, Any]:
         "numOfRows": 100,
         "pageNo": 1
     })
-    
+
+    # 디버깅: 원본 XML 저장
+    raw_xml = ""
+    if root is not None:
+        raw_xml = ET.tostring(root, encoding='unicode')
+
     result = {
         "exposure_routes": "",
         "acute_toxicity": {"oral": "", "dermal": "", "inhalation": ""},
@@ -150,7 +155,9 @@ def get_toxicity_info(chem_id: str) -> Dict[str, Any]:
         "stot_single": "",
         "stot_repeated": "",
         "aspiration_hazard": "",
-        "raw_items": []
+        "raw_items": [],
+        "_debug_xml": raw_xml,
+        "_debug_chemId": chem_id
     }
     
     if root is None:

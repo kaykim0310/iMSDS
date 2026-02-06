@@ -117,13 +117,15 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
         
         if st.button("🔍 KOSHA API에서 독성 정보 조회", type="primary", key="api_query_btn"):
             try:
-                # 프로젝트 루트에 kosha_api_extended.py 파일이 있어야 합니다
                 import sys
                 import os
-                # 현재 파일의 상위 디렉토리(프로젝트 루트)를 path에 추가
-                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                from kosha_api_extended import get_toxicity_info, search_by_cas
+                import importlib
                 import time
+                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                # 모듈 캐시 강제 리로드
+                import kosha_api_extended
+                importlib.reload(kosha_api_extended)
+                from kosha_api_extended import get_toxicity_info, search_by_cas
 
                 with st.spinner("KOSHA API에서 데이터를 조회 중입니다..."):
                     api_results = []
@@ -274,6 +276,7 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                 tox = result.get('toxicity', {})
                 raw_items = tox.get('raw_items', [])
                 chem_id = result.get('chemId', '?')
+                debug_xml = tox.get('_debug_xml', '(없음)')
                 with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']}, chemId: {chem_id}) - {len(raw_items)}개 항목", expanded=True):
                     if raw_items:
                         for item in raw_items:
@@ -281,10 +284,10 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                             detail = item.get('detail', '자료없음')
                             st.markdown(f"- **{iname}**: {detail}")
                     else:
-                        st.warning("⚠️ API에서 반환된 독성 항목이 없습니다. (raw_items 비어있음)")
-                    # 진단용: 파싱된 데이터 확인
-                    with st.expander("🔧 파싱된 데이터 (진단용)"):
-                        st.json(tox)
+                        st.error("⚠️ API에서 반환된 독성 항목이 0개입니다.")
+                    # 진단: API 원본 XML 확인
+                    with st.expander("🔧 API 원본 XML 응답 (진단용)"):
+                        st.code(debug_xml[:3000] if debug_xml else "(응답 없음)", language="xml")
 
 st.markdown("---")
 
