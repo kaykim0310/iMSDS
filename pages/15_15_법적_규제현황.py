@@ -86,17 +86,15 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
         
         if st.button("🔍 KOSHA API에서 법적 규제현황 조회", type="primary", key="api_query_btn"):
             try:
-                # 프로젝트 루트에 kosha_api_extended.py 파일이 있어야 합니다
                 import sys
                 import os
-                # 현재 파일의 상위 디렉토리(프로젝트 루트)를 path에 추가
                 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 from kosha_api_extended import get_legal_regulations, search_by_cas
                 import time
-                
+
                 with st.spinner("KOSHA API에서 데이터를 조회 중입니다..."):
                     api_results = []
-                    
+
                     for cas in cas_list:
                         search_result = search_by_cas(cas)
                         if search_result.get('success'):
@@ -107,6 +105,7 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                             api_results.append({
                                 'cas': cas,
                                 'name': name,
+                                'chemId': chem_id,
                                 'regulations': regulations
                             })
                         else:
@@ -116,109 +115,103 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                                 'error': search_result.get('error', '조회 실패')
                             })
                         time.sleep(0.3)
-                    
+
                     st.session_state['section15_api_results'] = api_results
+
+                    # 조회 즉시 폼에 자동 반영
+                    occ_safety_parts = []
+                    chem_ctrl_parts = []
+                    chem_reg_parts = []
+                    hazmat_parts = []
+                    waste_parts = []
+                    other_parts = []
+
+                    for result in api_results:
+                        if 'error' in result:
+                            continue
+                        reg = result.get('regulations', {})
+                        mat_name = result.get('name', result.get('cas', ''))
+
+                        occ = reg.get('occupational_safety', {})
+                        raw_text = occ.get('raw_text', '')
+                        if raw_text:
+                            occ_safety_parts.append(f"[{mat_name}] {raw_text}")
+                        else:
+                            occ_items = []
+                            if occ.get('measurement') == 'O': occ_items.append("작업환경측정대상")
+                            if occ.get('health_check') == 'O': occ_items.append("특수건강진단대상")
+                            if occ.get('managed_hazard') == 'O': occ_items.append("관리대상유해물질")
+                            if occ.get('special_managed') == 'O': occ_items.append("특별관리물질")
+                            if occ.get('exposure_limit') == 'O': occ_items.append("노출기준설정물질")
+                            if occ.get('permission') == 'O': occ_items.append("허가대상물질")
+                            if occ.get('prohibited') == 'O': occ_items.append("제조금지물질")
+                            if occ_items:
+                                occ_safety_parts.append(f"[{mat_name}] " + ", ".join(occ_items))
+
+                        chem = reg.get('chemical_control', {})
+                        chem_raw = chem.get('raw_text', '')
+                        if chem_raw:
+                            chem_ctrl_parts.append(f"[{mat_name}] {chem_raw}")
+                        else:
+                            chem_items = []
+                            if chem.get('toxic') == 'O': chem_items.append("유독물질")
+                            if chem.get('permitted') == 'O': chem_items.append("허가물질")
+                            if chem.get('restricted') == 'O': chem_items.append("제한물질")
+                            if chem.get('prohibited') == 'O': chem_items.append("금지물질")
+                            if chem.get('accident') == 'O': chem_items.append("사고대비물질")
+                            if chem_items:
+                                chem_ctrl_parts.append(f"[{mat_name}] " + ", ".join(chem_items))
+
+                        cr = reg.get('chemical_registration', '')
+                        if cr and cr != "해당없음":
+                            chem_reg_parts.append(f"[{mat_name}] {cr}")
+                        hm = reg.get('hazardous_materials', '')
+                        if hm and hm != "해당없음":
+                            hazmat_parts.append(f"[{mat_name}] {hm}")
+                        wm = reg.get('waste_management', '')
+                        if wm and wm != "해당없음":
+                            waste_parts.append(f"[{mat_name}] {wm}")
+                        ot = reg.get('other_regulations', '')
+                        if ot and ot != "해당없음":
+                            other_parts.append(f"[{mat_name}] {ot}")
+
+                    st.session_state.section15_data['가_산업안전보건법에_의한_규제'] = "\n".join(occ_safety_parts) if occ_safety_parts else "해당없음"
+                    st.session_state.section15_data['나_화학물질관리법에_의한_규제'] = "\n".join(chem_ctrl_parts) if chem_ctrl_parts else "해당없음"
+                    st.session_state.section15_data['다_화학물질의_등록_및_평가_등에_관한_법률에_의한_규제'] = "\n".join(chem_reg_parts) if chem_reg_parts else "해당없음"
+                    st.session_state.section15_data['라_위험물안전관리법에_의한_규제'] = "\n".join(hazmat_parts) if hazmat_parts else "해당없음"
+                    st.session_state.section15_data['마_폐기물관리법에_의한_규제'] = "\n".join(waste_parts) if waste_parts else "해당없음"
+                    st.session_state.section15_data['바_기타_국내_및_외국법에_의한_규제'] = "\n".join(other_parts) if other_parts else "해당없음"
+
                     st.rerun()
-                    
+
             except ImportError:
                 st.error("❌ kosha_api_extended.py 모듈을 찾을 수 없습니다.")
             except Exception as e:
                 st.error(f"❌ API 조회 중 오류: {e}")
     else:
         st.warning("⚠️ 섹션 3에 CAS 번호가 등록된 구성성분이 없습니다.")
-    
+
     # API 결과 표시
     if 'section15_api_results' in st.session_state:
         st.markdown("---")
         st.markdown("**📊 조회 결과:**")
 
-        has_valid_results = False
         for result in st.session_state['section15_api_results']:
             if 'error' in result:
                 st.warning(f"⚠️ {result['cas']}: {result['error']}")
             else:
-                has_valid_results = True
                 reg = result.get('regulations', {})
-                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']})", expanded=True):
-                    raw_items = reg.get('raw_items', [])
+                raw_items = reg.get('raw_items', [])
+                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']}) - {len(raw_items)}개 항목", expanded=True):
                     if raw_items:
                         for item in raw_items:
                             iname = item.get('name', '')
                             detail = item.get('detail', '해당없음')
                             st.markdown(f"- **{iname}**: {detail}")
                     else:
-                        st.warning("API에서 반환된 법적 규제 항목이 없습니다.")
-
-        # 자동 반영 버튼
-        if has_valid_results:
-            if st.button("📥 조회 결과를 양식에 자동 반영", key="auto_fill_btn"):
-                occ_safety_parts = []
-                chem_ctrl_parts = []
-                chem_reg_parts = []
-                hazmat_parts = []
-                waste_parts = []
-                other_parts = []
-
-                for result in st.session_state['section15_api_results']:
-                    if 'error' in result:
-                        continue
-                    reg = result.get('regulations', {})
-                    name = result.get('name', result.get('cas', ''))
-
-                    # 산업안전보건법
-                    occ = reg.get('occupational_safety', {})
-                    raw_text = occ.get('raw_text', '')
-                    if raw_text:
-                        occ_safety_parts.append(f"[{name}] {raw_text}")
-                    else:
-                        occ_items = []
-                        if occ.get('measurement') == 'O': occ_items.append("작업환경측정대상")
-                        if occ.get('health_check') == 'O': occ_items.append("특수건강진단대상")
-                        if occ.get('managed_hazard') == 'O': occ_items.append("관리대상유해물질")
-                        if occ.get('special_managed') == 'O': occ_items.append("특별관리물질")
-                        if occ.get('exposure_limit') == 'O': occ_items.append("노출기준설정물질")
-                        if occ.get('permission') == 'O': occ_items.append("허가대상물질")
-                        if occ.get('prohibited') == 'O': occ_items.append("제조금지물질")
-                        if occ_items:
-                            occ_safety_parts.append(f"[{name}] " + ", ".join(occ_items))
-
-                    # 화학물질관리법
-                    chem = reg.get('chemical_control', {})
-                    chem_raw = chem.get('raw_text', '')
-                    if chem_raw:
-                        chem_ctrl_parts.append(f"[{name}] {chem_raw}")
-                    else:
-                        chem_items = []
-                        if chem.get('toxic') == 'O': chem_items.append("유독물질")
-                        if chem.get('permitted') == 'O': chem_items.append("허가물질")
-                        if chem.get('restricted') == 'O': chem_items.append("제한물질")
-                        if chem.get('prohibited') == 'O': chem_items.append("금지물질")
-                        if chem.get('accident') == 'O': chem_items.append("사고대비물질")
-                        if chem_items:
-                            chem_ctrl_parts.append(f"[{name}] " + ", ".join(chem_items))
-
-                    cr = reg.get('chemical_registration', '')
-                    if cr and cr != "해당없음":
-                        chem_reg_parts.append(f"[{name}] {cr}")
-                    hm = reg.get('hazardous_materials', '')
-                    if hm and hm != "해당없음":
-                        hazmat_parts.append(f"[{name}] {hm}")
-                    wm = reg.get('waste_management', '')
-                    if wm and wm != "해당없음":
-                        waste_parts.append(f"[{name}] {wm}")
-                    ot = reg.get('other_regulations', '')
-                    if ot and ot != "해당없음":
-                        other_parts.append(f"[{name}] {ot}")
-
-                st.session_state.section15_data['가_산업안전보건법에_의한_규제'] = "\n".join(occ_safety_parts) if occ_safety_parts else "해당없음"
-                st.session_state.section15_data['나_화학물질관리법에_의한_규제'] = "\n".join(chem_ctrl_parts) if chem_ctrl_parts else "해당없음"
-                st.session_state.section15_data['다_화학물질의_등록_및_평가_등에_관한_법률에_의한_규제'] = "\n".join(chem_reg_parts) if chem_reg_parts else "해당없음"
-                st.session_state.section15_data['라_위험물안전관리법에_의한_규제'] = "\n".join(hazmat_parts) if hazmat_parts else "해당없음"
-                st.session_state.section15_data['마_폐기물관리법에_의한_규제'] = "\n".join(waste_parts) if waste_parts else "해당없음"
-                st.session_state.section15_data['바_기타_국내_및_외국법에_의한_규제'] = "\n".join(other_parts) if other_parts else "해당없음"
-
-                st.success("✅ API 조회 결과가 양식에 반영되었습니다.")
-                st.rerun()
+                        st.warning("⚠️ API에서 반환된 법적 규제 항목이 없습니다.")
+                    with st.expander("🔧 파싱된 데이터 (진단용)"):
+                        st.json(reg)
 
 st.markdown("---")
 

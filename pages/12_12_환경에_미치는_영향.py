@@ -85,17 +85,15 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
         
         if st.button("🔍 KOSHA API에서 환경 영향 정보 조회", type="primary", key="api_query_btn"):
             try:
-                # 프로젝트 루트에 kosha_api_extended.py 파일이 있어야 합니다
                 import sys
                 import os
-                # 현재 파일의 상위 디렉토리(프로젝트 루트)를 path에 추가
                 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 from kosha_api_extended import get_environmental_info, search_by_cas
                 import time
-                
+
                 with st.spinner("KOSHA API에서 데이터를 조회 중입니다..."):
                     api_results = []
-                    
+
                     for cas in cas_list:
                         search_result = search_by_cas(cas)
                         if search_result.get('success'):
@@ -106,6 +104,7 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                             api_results.append({
                                 'cas': cas,
                                 'name': name,
+                                'chemId': chem_id,
                                 'environmental': env_info
                             })
                         else:
@@ -115,88 +114,83 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                                 'error': search_result.get('error', '조회 실패')
                             })
                         time.sleep(0.3)
-                    
+
                     st.session_state['section12_api_results'] = api_results
+
+                    # 조회 즉시 폼에 자동 반영
+                    eco_parts = []
+                    persist_parts = []
+                    bioaccum_parts = []
+                    soil_parts = []
+                    other_parts = []
+
+                    for result in api_results:
+                        if 'error' in result:
+                            continue
+                        env = result.get('environmental', {})
+                        mat_name = result.get('name', result.get('cas', ''))
+
+                        def _val(v):
+                            return v if v and v != "자료없음" else ""
+
+                        eco = env.get('ecological_toxicity', {})
+                        eco_lines = []
+                        if _val(eco.get('fish')):
+                            eco_lines.append(f"어류: {eco['fish']}")
+                        if _val(eco.get('daphnia')):
+                            eco_lines.append(f"물벼룩: {eco['daphnia']}")
+                        if _val(eco.get('algae')):
+                            eco_lines.append(f"조류: {eco['algae']}")
+                        if _val(eco.get('other')):
+                            eco_lines.append(f"기타: {eco['other']}")
+                        if eco_lines:
+                            eco_parts.append(f"[{mat_name}]\n" + "\n".join(eco_lines))
+
+                        if _val(env.get('persistence')):
+                            persist_parts.append(f"[{mat_name}] {env['persistence']}")
+                        if _val(env.get('bioaccumulation')):
+                            bioaccum_parts.append(f"[{mat_name}] {env['bioaccumulation']}")
+                        if _val(env.get('soil_mobility')):
+                            soil_parts.append(f"[{mat_name}] {env['soil_mobility']}")
+                        if _val(env.get('other_effects')):
+                            other_parts.append(f"[{mat_name}] {env['other_effects']}")
+
+                    st.session_state.section12_data['가_생태독성'] = "\n".join(eco_parts) if eco_parts else "자료없음"
+                    st.session_state.section12_data['나_잔류성_및_분해성'] = "\n".join(persist_parts) if persist_parts else "자료없음"
+                    st.session_state.section12_data['다_생물_농축성'] = "\n".join(bioaccum_parts) if bioaccum_parts else "자료없음"
+                    st.session_state.section12_data['라_토양_이동성'] = "\n".join(soil_parts) if soil_parts else "자료없음"
+                    st.session_state.section12_data['마_기타_유해_영향'] = "\n".join(other_parts) if other_parts else "자료없음"
+
                     st.rerun()
-                    
+
             except ImportError:
                 st.error("❌ kosha_api_extended.py 모듈을 찾을 수 없습니다.")
             except Exception as e:
                 st.error(f"❌ API 조회 중 오류: {e}")
     else:
         st.warning("⚠️ 섹션 3에 CAS 번호가 등록된 구성성분이 없습니다.")
-    
+
     # API 결과 표시
     if 'section12_api_results' in st.session_state:
         st.markdown("---")
         st.markdown("**📊 조회 결과:**")
 
-        has_valid_results = False
         for result in st.session_state['section12_api_results']:
             if 'error' in result:
                 st.warning(f"⚠️ {result['cas']}: {result['error']}")
             else:
-                has_valid_results = True
                 env = result.get('environmental', {})
-                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']})", expanded=True):
-                    raw_items = env.get('raw_items', [])
+                raw_items = env.get('raw_items', [])
+                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']}) - {len(raw_items)}개 항목", expanded=True):
                     if raw_items:
                         for item in raw_items:
-                            name = item.get('name', '')
+                            iname = item.get('name', '')
                             detail = item.get('detail', '자료없음')
-                            st.markdown(f"- **{name}**: {detail}")
+                            st.markdown(f"- **{iname}**: {detail}")
                     else:
-                        st.warning("API에서 반환된 환경 영향 항목이 없습니다.")
-
-        # 자동 반영 버튼
-        if has_valid_results:
-            if st.button("📥 조회 결과를 양식에 자동 반영", key="auto_fill_btn"):
-                eco_parts = []
-                persist_parts = []
-                bioaccum_parts = []
-                soil_parts = []
-                other_parts = []
-
-                for result in st.session_state['section12_api_results']:
-                    if 'error' in result:
-                        continue
-                    env = result.get('environmental', {})
-                    name = result.get('name', result.get('cas', ''))
-
-                    def _val(v):
-                        return v if v and v != "자료없음" else ""
-
-                    # 생태독성
-                    eco = env.get('ecological_toxicity', {})
-                    eco_lines = []
-                    if _val(eco.get('fish')):
-                        eco_lines.append(f"어류: {eco['fish']}")
-                    if _val(eco.get('daphnia')):
-                        eco_lines.append(f"물벼룩: {eco['daphnia']}")
-                    if _val(eco.get('algae')):
-                        eco_lines.append(f"조류: {eco['algae']}")
-                    if _val(eco.get('other')):
-                        eco_lines.append(f"기타: {eco['other']}")
-                    if eco_lines:
-                        eco_parts.append(f"[{name}]\n" + "\n".join(eco_lines))
-
-                    if _val(env.get('persistence')):
-                        persist_parts.append(f"[{name}] {env['persistence']}")
-                    if _val(env.get('bioaccumulation')):
-                        bioaccum_parts.append(f"[{name}] {env['bioaccumulation']}")
-                    if _val(env.get('soil_mobility')):
-                        soil_parts.append(f"[{name}] {env['soil_mobility']}")
-                    if _val(env.get('other_effects')):
-                        other_parts.append(f"[{name}] {env['other_effects']}")
-
-                st.session_state.section12_data['가_생태독성'] = "\n".join(eco_parts) if eco_parts else "자료없음"
-                st.session_state.section12_data['나_잔류성_및_분해성'] = "\n".join(persist_parts) if persist_parts else "자료없음"
-                st.session_state.section12_data['다_생물_농축성'] = "\n".join(bioaccum_parts) if bioaccum_parts else "자료없음"
-                st.session_state.section12_data['라_토양_이동성'] = "\n".join(soil_parts) if soil_parts else "자료없음"
-                st.session_state.section12_data['마_기타_유해_영향'] = "\n".join(other_parts) if other_parts else "자료없음"
-
-                st.success("✅ API 조회 결과가 양식에 반영되었습니다.")
-                st.rerun()
+                        st.warning("⚠️ API에서 반환된 환경 항목이 없습니다.")
+                    with st.expander("🔧 파싱된 데이터 (진단용)"):
+                        st.json(env)
 
 st.markdown("---")
 
