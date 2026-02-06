@@ -33,16 +33,25 @@ def _call_api(endpoint: str, params: Dict[str, Any]) -> Optional[ET.Element]:
     """API 호출 후 XML 파싱하여 반환"""
     url = f"{BASE_URL}/{endpoint}"
     params["serviceKey"] = API_KEY
-    
+
     try:
         response = requests.get(url, params=params, timeout=TIMEOUT)
         response.raise_for_status()
-        return ET.fromstring(response.content)
+        root = ET.fromstring(response.content)
+
+        # 응답 코드 및 아이템 수 로깅
+        result_code = _get_text(root, ".//resultCode")
+        result_msg = _get_text(root, ".//resultMsg")
+        total_count = _get_text(root, ".//totalCount")
+        items = root.findall(".//item")
+        print(f"[API] {endpoint}: resultCode={result_code}, resultMsg={result_msg}, totalCount={total_count}, items={len(items)}")
+
+        return root
     except requests.RequestException as e:
-        print(f"[ERROR] API 호출 실패: {e}")
+        print(f"[ERROR] API 호출 실패 ({endpoint}): {e}")
         return None
     except ET.ParseError as e:
-        print(f"[ERROR] XML 파싱 실패: {e}")
+        print(f"[ERROR] XML 파싱 실패 ({endpoint}): {e}")
         return None
 
 
@@ -122,7 +131,11 @@ def get_toxicity_info(chem_id: str) -> Dict[str, Any]:
             'raw_items': [...]                  # 원본 데이터
         }
     """
-    root = _call_api("chemdetail11", {"chemId": chem_id})
+    root = _call_api("chemdetail11", {
+        "chemId": chem_id,
+        "numOfRows": 100,
+        "pageNo": 1
+    })
     
     result = {
         "exposure_routes": "",
@@ -220,7 +233,11 @@ def get_environmental_info(chem_id: str) -> Dict[str, Any]:
             'raw_items': [...]               # 원본 데이터
         }
     """
-    root = _call_api("chemdetail12", {"chemId": chem_id})
+    root = _call_api("chemdetail12", {
+        "chemId": chem_id,
+        "numOfRows": 100,
+        "pageNo": 1
+    })
     
     result = {
         "ecological_toxicity": {
@@ -297,7 +314,11 @@ def get_legal_regulations(chem_id: str) -> Dict[str, Any]:
             'raw_items': [...]               # 원본 데이터
         }
     """
-    root = _call_api("chemdetail15", {"chemId": chem_id})
+    root = _call_api("chemdetail15", {
+        "chemId": chem_id,
+        "numOfRows": 100,
+        "pageNo": 1
+    })
     
     result = {
         "occupational_safety": {

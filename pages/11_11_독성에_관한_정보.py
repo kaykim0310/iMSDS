@@ -162,14 +162,102 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
     if 'section11_api_results' in st.session_state:
         st.markdown("---")
         st.markdown("**📊 조회 결과:**")
-        
+
+        has_valid_results = False
         for result in st.session_state['section11_api_results']:
             if 'error' in result:
                 st.warning(f"⚠️ {result['cas']}: {result['error']}")
             else:
-                st.info(f"✅ **{result['name']}** (CAS: {result['cas']}) - 조회 완료")
-        
-        st.markdown("*위 정보를 참고하여 아래 양식을 작성하세요.*")
+                has_valid_results = True
+                tox = result.get('toxicity', {})
+                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']})", expanded=True):
+                    # 원본 데이터 항목 표시
+                    raw_items = tox.get('raw_items', [])
+                    if raw_items:
+                        for item in raw_items:
+                            name = item.get('name', '')
+                            detail = item.get('detail', '자료없음')
+                            st.markdown(f"- **{name}**: {detail}")
+                    else:
+                        st.warning("API에서 반환된 독성 항목이 없습니다.")
+
+        # 자동 반영 버튼
+        if has_valid_results:
+            if st.button("📥 조회 결과를 양식에 자동 반영", key="auto_fill_btn"):
+                # 모든 물질의 독성 정보를 합쳐서 폼에 반영
+                exposure_parts = []
+                acute_parts = []
+                skin_corrosion_parts = []
+                eye_damage_parts = []
+                resp_sens_parts = []
+                skin_sens_parts = []
+                carcino_parts = []
+                mutagen_parts = []
+                repro_parts = []
+                stot_single_parts = []
+                stot_repeated_parts = []
+                aspiration_parts = []
+
+                for result in st.session_state['section11_api_results']:
+                    if 'error' in result:
+                        continue
+                    tox = result.get('toxicity', {})
+                    name = result.get('name', result.get('cas', ''))
+
+                    def _val(v):
+                        return v if v and v != "자료없음" else ""
+
+                    if _val(tox.get('exposure_routes')):
+                        exposure_parts.append(f"[{name}] {tox['exposure_routes']}")
+
+                    # 급성 독성
+                    acute = tox.get('acute_toxicity', {})
+                    acute_lines = []
+                    if _val(acute.get('oral')):
+                        acute_lines.append(f"경구: {acute['oral']}")
+                    if _val(acute.get('dermal')):
+                        acute_lines.append(f"경피: {acute['dermal']}")
+                    if _val(acute.get('inhalation')):
+                        acute_lines.append(f"흡입: {acute['inhalation']}")
+                    if acute_lines:
+                        acute_parts.append(f"[{name}] " + " / ".join(acute_lines))
+
+                    if _val(tox.get('skin_corrosion')):
+                        skin_corrosion_parts.append(f"[{name}] {tox['skin_corrosion']}")
+                    if _val(tox.get('eye_damage')):
+                        eye_damage_parts.append(f"[{name}] {tox['eye_damage']}")
+                    if _val(tox.get('respiratory_sensitization')):
+                        resp_sens_parts.append(f"[{name}] {tox['respiratory_sensitization']}")
+                    if _val(tox.get('skin_sensitization')):
+                        skin_sens_parts.append(f"[{name}] {tox['skin_sensitization']}")
+                    if _val(tox.get('carcinogenicity')):
+                        carcino_parts.append(f"[{name}] {tox['carcinogenicity']}")
+                    if _val(tox.get('germ_cell_mutagenicity')):
+                        mutagen_parts.append(f"[{name}] {tox['germ_cell_mutagenicity']}")
+                    if _val(tox.get('reproductive_toxicity')):
+                        repro_parts.append(f"[{name}] {tox['reproductive_toxicity']}")
+                    if _val(tox.get('stot_single')):
+                        stot_single_parts.append(f"[{name}] {tox['stot_single']}")
+                    if _val(tox.get('stot_repeated')):
+                        stot_repeated_parts.append(f"[{name}] {tox['stot_repeated']}")
+                    if _val(tox.get('aspiration_hazard')):
+                        aspiration_parts.append(f"[{name}] {tox['aspiration_hazard']}")
+
+                st.session_state.section11_data['가_가능성이_높은_노출_경로에_관한_정보'] = "\n".join(exposure_parts) if exposure_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['급성_독성'] = "\n".join(acute_parts) if acute_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['피부_부식성_또는_자극성'] = "\n".join(skin_corrosion_parts) if skin_corrosion_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['심한_눈_손상_또는_자극성'] = "\n".join(eye_damage_parts) if eye_damage_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['호흡기_과민성'] = "\n".join(resp_sens_parts) if resp_sens_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['피부_과민성'] = "\n".join(skin_sens_parts) if skin_sens_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['발암성'] = "\n".join(carcino_parts) if carcino_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['생식세포_변이원성'] = "\n".join(mutagen_parts) if mutagen_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['생식독성'] = "\n".join(repro_parts) if repro_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['특정_표적장기_독성_1회_노출'] = "\n".join(stot_single_parts) if stot_single_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['특정_표적장기_독성_반복_노출'] = "\n".join(stot_repeated_parts) if stot_repeated_parts else "자료없음"
+                st.session_state.section11_data['나_건강_유해성_정보']['흡인_유해성'] = "\n".join(aspiration_parts) if aspiration_parts else "자료없음"
+
+                st.success("✅ API 조회 결과가 양식에 반영되었습니다.")
+                st.rerun()
 
 st.markdown("---")
 

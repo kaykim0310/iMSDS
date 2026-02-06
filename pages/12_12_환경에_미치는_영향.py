@@ -130,14 +130,73 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
     if 'section12_api_results' in st.session_state:
         st.markdown("---")
         st.markdown("**📊 조회 결과:**")
-        
+
+        has_valid_results = False
         for result in st.session_state['section12_api_results']:
             if 'error' in result:
                 st.warning(f"⚠️ {result['cas']}: {result['error']}")
             else:
-                st.info(f"✅ **{result['name']}** (CAS: {result['cas']}) - 조회 완료")
-        
-        st.markdown("*위 정보를 참고하여 아래 양식을 작성하세요.*")
+                has_valid_results = True
+                env = result.get('environmental', {})
+                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']})", expanded=True):
+                    raw_items = env.get('raw_items', [])
+                    if raw_items:
+                        for item in raw_items:
+                            name = item.get('name', '')
+                            detail = item.get('detail', '자료없음')
+                            st.markdown(f"- **{name}**: {detail}")
+                    else:
+                        st.warning("API에서 반환된 환경 영향 항목이 없습니다.")
+
+        # 자동 반영 버튼
+        if has_valid_results:
+            if st.button("📥 조회 결과를 양식에 자동 반영", key="auto_fill_btn"):
+                eco_parts = []
+                persist_parts = []
+                bioaccum_parts = []
+                soil_parts = []
+                other_parts = []
+
+                for result in st.session_state['section12_api_results']:
+                    if 'error' in result:
+                        continue
+                    env = result.get('environmental', {})
+                    name = result.get('name', result.get('cas', ''))
+
+                    def _val(v):
+                        return v if v and v != "자료없음" else ""
+
+                    # 생태독성
+                    eco = env.get('ecological_toxicity', {})
+                    eco_lines = []
+                    if _val(eco.get('fish')):
+                        eco_lines.append(f"어류: {eco['fish']}")
+                    if _val(eco.get('daphnia')):
+                        eco_lines.append(f"물벼룩: {eco['daphnia']}")
+                    if _val(eco.get('algae')):
+                        eco_lines.append(f"조류: {eco['algae']}")
+                    if _val(eco.get('other')):
+                        eco_lines.append(f"기타: {eco['other']}")
+                    if eco_lines:
+                        eco_parts.append(f"[{name}]\n" + "\n".join(eco_lines))
+
+                    if _val(env.get('persistence')):
+                        persist_parts.append(f"[{name}] {env['persistence']}")
+                    if _val(env.get('bioaccumulation')):
+                        bioaccum_parts.append(f"[{name}] {env['bioaccumulation']}")
+                    if _val(env.get('soil_mobility')):
+                        soil_parts.append(f"[{name}] {env['soil_mobility']}")
+                    if _val(env.get('other_effects')):
+                        other_parts.append(f"[{name}] {env['other_effects']}")
+
+                st.session_state.section12_data['가_생태독성'] = "\n".join(eco_parts) if eco_parts else "자료없음"
+                st.session_state.section12_data['나_잔류성_및_분해성'] = "\n".join(persist_parts) if persist_parts else "자료없음"
+                st.session_state.section12_data['다_생물_농축성'] = "\n".join(bioaccum_parts) if bioaccum_parts else "자료없음"
+                st.session_state.section12_data['라_토양_이동성'] = "\n".join(soil_parts) if soil_parts else "자료없음"
+                st.session_state.section12_data['마_기타_유해_영향'] = "\n".join(other_parts) if other_parts else "자료없음"
+
+                st.success("✅ API 조회 결과가 양식에 반영되었습니다.")
+                st.rerun()
 
 st.markdown("---")
 
