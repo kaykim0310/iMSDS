@@ -209,18 +209,49 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                         if _val(tox.get('aspiration_hazard')):
                             aspiration_parts.append(f"[{mat_name}] {tox['aspiration_hazard']}")
 
-                    st.session_state.section11_data['가_가능성이_높은_노출_경로에_관한_정보'] = "\n".join(exposure_parts) if exposure_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['급성_독성'] = "\n".join(acute_parts) if acute_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['피부_부식성_또는_자극성'] = "\n".join(skin_corrosion_parts) if skin_corrosion_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['심한_눈_손상_또는_자극성'] = "\n".join(eye_damage_parts) if eye_damage_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['호흡기_과민성'] = "\n".join(resp_sens_parts) if resp_sens_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['피부_과민성'] = "\n".join(skin_sens_parts) if skin_sens_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['발암성'] = "\n".join(carcino_parts) if carcino_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['생식세포_변이원성'] = "\n".join(mutagen_parts) if mutagen_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['생식독성'] = "\n".join(repro_parts) if repro_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['특정_표적장기_독성_1회_노출'] = "\n".join(stot_single_parts) if stot_single_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['특정_표적장기_독성_반복_노출'] = "\n".join(stot_repeated_parts) if stot_repeated_parts else "자료없음"
-                    st.session_state.section11_data['나_건강_유해성_정보']['흡인_유해성'] = "\n".join(aspiration_parts) if aspiration_parts else "자료없음"
+                    # 위젯 키와 데이터 딕셔너리 동시에 업데이트
+                    fill_map = {
+                        'exposure_routes': "\n".join(exposure_parts) if exposure_parts else "자료없음",
+                        'acute_toxicity': "\n".join(acute_parts) if acute_parts else "자료없음",
+                        'skin_corrosion': "\n".join(skin_corrosion_parts) if skin_corrosion_parts else "자료없음",
+                        'eye_damage': "\n".join(eye_damage_parts) if eye_damage_parts else "자료없음",
+                        'respiratory_sensitization': "\n".join(resp_sens_parts) if resp_sens_parts else "자료없음",
+                        'skin_sensitization': "\n".join(skin_sens_parts) if skin_sens_parts else "자료없음",
+                        'carcinogenicity': "\n".join(carcino_parts) if carcino_parts else "자료없음",
+                        'germ_cell_mutagenicity': "\n".join(mutagen_parts) if mutagen_parts else "자료없음",
+                        'reproductive_toxicity': "\n".join(repro_parts) if repro_parts else "자료없음",
+                        'stot_single': "\n".join(stot_single_parts) if stot_single_parts else "자료없음",
+                        'stot_repeated': "\n".join(stot_repeated_parts) if stot_repeated_parts else "자료없음",
+                        'aspiration_hazard': "\n".join(aspiration_parts) if aspiration_parts else "자료없음",
+                    }
+
+                    # Streamlit 위젯 키 직접 업데이트 (이게 핵심!)
+                    st.session_state['exposure_routes'] = fill_map['exposure_routes']
+                    st.session_state['acute_toxicity'] = fill_map['acute_toxicity']
+                    st.session_state['skin_corrosion'] = fill_map['skin_corrosion']
+                    st.session_state['eye_damage'] = fill_map['eye_damage']
+                    st.session_state['respiratory_sensitization'] = fill_map['respiratory_sensitization']
+                    st.session_state['skin_sensitization'] = fill_map['skin_sensitization']
+                    st.session_state['carcinogenicity'] = fill_map['carcinogenicity']
+                    st.session_state['germ_cell_mutagenicity'] = fill_map['germ_cell_mutagenicity']
+                    st.session_state['reproductive_toxicity'] = fill_map['reproductive_toxicity']
+                    st.session_state['stot_single'] = fill_map['stot_single']
+                    st.session_state['stot_repeated'] = fill_map['stot_repeated']
+                    st.session_state['aspiration_hazard'] = fill_map['aspiration_hazard']
+
+                    # 데이터 딕셔너리도 업데이트
+                    st.session_state.section11_data['가_가능성이_높은_노출_경로에_관한_정보'] = fill_map['exposure_routes']
+                    st.session_state.section11_data['나_건강_유해성_정보']['급성_독성'] = fill_map['acute_toxicity']
+                    st.session_state.section11_data['나_건강_유해성_정보']['피부_부식성_또는_자극성'] = fill_map['skin_corrosion']
+                    st.session_state.section11_data['나_건강_유해성_정보']['심한_눈_손상_또는_자극성'] = fill_map['eye_damage']
+                    st.session_state.section11_data['나_건강_유해성_정보']['호흡기_과민성'] = fill_map['respiratory_sensitization']
+                    st.session_state.section11_data['나_건강_유해성_정보']['피부_과민성'] = fill_map['skin_sensitization']
+                    st.session_state.section11_data['나_건강_유해성_정보']['발암성'] = fill_map['carcinogenicity']
+                    st.session_state.section11_data['나_건강_유해성_정보']['생식세포_변이원성'] = fill_map['germ_cell_mutagenicity']
+                    st.session_state.section11_data['나_건강_유해성_정보']['생식독성'] = fill_map['reproductive_toxicity']
+                    st.session_state.section11_data['나_건강_유해성_정보']['특정_표적장기_독성_1회_노출'] = fill_map['stot_single']
+                    st.session_state.section11_data['나_건강_유해성_정보']['특정_표적장기_독성_반복_노출'] = fill_map['stot_repeated']
+                    st.session_state.section11_data['나_건강_유해성_정보']['흡인_유해성'] = fill_map['aspiration_hazard']
 
                     st.rerun()
 

@@ -155,11 +155,27 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                         if _val(env.get('other_effects')):
                             other_parts.append(f"[{mat_name}] {env['other_effects']}")
 
-                    st.session_state.section12_data['가_생태독성'] = "\n".join(eco_parts) if eco_parts else "자료없음"
-                    st.session_state.section12_data['나_잔류성_및_분해성'] = "\n".join(persist_parts) if persist_parts else "자료없음"
-                    st.session_state.section12_data['다_생물_농축성'] = "\n".join(bioaccum_parts) if bioaccum_parts else "자료없음"
-                    st.session_state.section12_data['라_토양_이동성'] = "\n".join(soil_parts) if soil_parts else "자료없음"
-                    st.session_state.section12_data['마_기타_유해_영향'] = "\n".join(other_parts) if other_parts else "자료없음"
+                    fill_map = {
+                        'ecological_toxicity': "\n".join(eco_parts) if eco_parts else "자료없음",
+                        'persistence_degradability': "\n".join(persist_parts) if persist_parts else "자료없음",
+                        'bioaccumulation': "\n".join(bioaccum_parts) if bioaccum_parts else "자료없음",
+                        'soil_mobility': "\n".join(soil_parts) if soil_parts else "자료없음",
+                        'other_adverse_effects': "\n".join(other_parts) if other_parts else "자료없음",
+                    }
+
+                    # Streamlit 위젯 키 직접 업데이트
+                    st.session_state['ecological_toxicity'] = fill_map['ecological_toxicity']
+                    st.session_state['persistence_degradability'] = fill_map['persistence_degradability']
+                    st.session_state['bioaccumulation'] = fill_map['bioaccumulation']
+                    st.session_state['soil_mobility'] = fill_map['soil_mobility']
+                    st.session_state['other_adverse_effects'] = fill_map['other_adverse_effects']
+
+                    # 데이터 딕셔너리도 업데이트
+                    st.session_state.section12_data['가_생태독성'] = fill_map['ecological_toxicity']
+                    st.session_state.section12_data['나_잔류성_및_분해성'] = fill_map['persistence_degradability']
+                    st.session_state.section12_data['다_생물_농축성'] = fill_map['bioaccumulation']
+                    st.session_state.section12_data['라_토양_이동성'] = fill_map['soil_mobility']
+                    st.session_state.section12_data['마_기타_유해_영향'] = fill_map['other_adverse_effects']
 
                     st.rerun()
 

@@ -175,12 +175,30 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                         if ot and ot != "해당없음":
                             other_parts.append(f"[{mat_name}] {ot}")
 
-                    st.session_state.section15_data['가_산업안전보건법에_의한_규제'] = "\n".join(occ_safety_parts) if occ_safety_parts else "해당없음"
-                    st.session_state.section15_data['나_화학물질관리법에_의한_규제'] = "\n".join(chem_ctrl_parts) if chem_ctrl_parts else "해당없음"
-                    st.session_state.section15_data['다_화학물질의_등록_및_평가_등에_관한_법률에_의한_규제'] = "\n".join(chem_reg_parts) if chem_reg_parts else "해당없음"
-                    st.session_state.section15_data['라_위험물안전관리법에_의한_규제'] = "\n".join(hazmat_parts) if hazmat_parts else "해당없음"
-                    st.session_state.section15_data['마_폐기물관리법에_의한_규제'] = "\n".join(waste_parts) if waste_parts else "해당없음"
-                    st.session_state.section15_data['바_기타_국내_및_외국법에_의한_규제'] = "\n".join(other_parts) if other_parts else "해당없음"
+                    fill_map = {
+                        'occupational_safety_law': "\n".join(occ_safety_parts) if occ_safety_parts else "해당없음",
+                        'chemical_control_law': "\n".join(chem_ctrl_parts) if chem_ctrl_parts else "해당없음",
+                        'chemical_registration_law': "\n".join(chem_reg_parts) if chem_reg_parts else "해당없음",
+                        'hazardous_materials_law': "\n".join(hazmat_parts) if hazmat_parts else "해당없음",
+                        'waste_management_law': "\n".join(waste_parts) if waste_parts else "해당없음",
+                        'other_regulations': "\n".join(other_parts) if other_parts else "해당없음",
+                    }
+
+                    # Streamlit 위젯 키 직접 업데이트
+                    st.session_state['occupational_safety_law'] = fill_map['occupational_safety_law']
+                    st.session_state['chemical_control_law'] = fill_map['chemical_control_law']
+                    st.session_state['chemical_registration_law'] = fill_map['chemical_registration_law']
+                    st.session_state['hazardous_materials_law'] = fill_map['hazardous_materials_law']
+                    st.session_state['waste_management_law'] = fill_map['waste_management_law']
+                    st.session_state['other_regulations'] = fill_map['other_regulations']
+
+                    # 데이터 딕셔너리도 업데이트
+                    st.session_state.section15_data['가_산업안전보건법에_의한_규제'] = fill_map['occupational_safety_law']
+                    st.session_state.section15_data['나_화학물질관리법에_의한_규제'] = fill_map['chemical_control_law']
+                    st.session_state.section15_data['다_화학물질의_등록_및_평가_등에_관한_법률에_의한_규제'] = fill_map['chemical_registration_law']
+                    st.session_state.section15_data['라_위험물안전관리법에_의한_규제'] = fill_map['hazardous_materials_law']
+                    st.session_state.section15_data['마_폐기물관리법에_의한_규제'] = fill_map['waste_management_law']
+                    st.session_state.section15_data['바_기타_국내_및_외국법에_의한_규제'] = fill_map['other_regulations']
 
                     st.rerun()
 
