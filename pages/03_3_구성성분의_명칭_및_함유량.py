@@ -213,7 +213,20 @@ if uploaded_file is not None:
                 })
             
             if st.button("엑셀 데이터 적용"):
+                # 기존 위젯 키 모두 제거 (이전 성분 개수만큼)
+                old_count = len(st.session_state.section3_data.get('components', []))
+                for old_idx in range(old_count):
+                    for wk in [f"material_{old_idx}", f"common_name_{old_idx}", f"cas_{old_idx}", f"content_{old_idx}"]:
+                        if wk in st.session_state:
+                            del st.session_state[wk]
+                # 데이터 딕셔너리 업데이트
                 st.session_state.section3_data['components'] = components_list
+                # 새 위젯 키 설정
+                for i, comp in enumerate(components_list):
+                    st.session_state[f"material_{i}"] = comp['물질명']
+                    st.session_state[f"common_name_{i}"] = comp['관용명(이명)']
+                    st.session_state[f"cas_{i}"] = comp['CAS번호']
+                    st.session_state[f"content_{i}"] = comp['함유량(%)']
                 st.success(f"✅ {len(components_list)}개의 성분 정보를 가져왔습니다!")
                 st.rerun()
         else:
