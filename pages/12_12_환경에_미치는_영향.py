@@ -58,16 +58,99 @@ if 'section12_data' not in st.session_state:
         '마_기타_유해_영향': ''
     }
 
+
+# ============================================================
+# API 결과 → 입력 필드 자동 매핑 헬퍼 함수
+# ============================================================
+def _val(text):
+    """자료없음이면 빈 문자열 반환"""
+    if not text or text.strip() in ("자료없음", ""):
+        return ""
+    return text.strip()
+
+
+def apply_api_results_to_section12(api_results):
+    """
+    API 조회 결과를 section12_data 세션 상태에 매핑합니다.
+    여러 물질이면 물질명 앞에 붙여서 합칩니다.
+    """
+    eco_lines = []
+    persistence_lines = []
+    bioaccum_lines = []
+    soil_lines = []
+    other_lines = []
+
+    for result in api_results:
+        if 'error' in result:
+            continue
+
+        name = result.get('name', result.get('cas', ''))
+        env = result.get('environmental', {})
+
+        # 가. 생태독성 — 어류/갑각류/조류를 합쳐서 기재
+        eco_parts = []
+        eco_tox = env.get('ecological_toxicity', {})
+        fish = _val(eco_tox.get('fish', ''))
+        daphnia = _val(eco_tox.get('daphnia', ''))
+        algae = _val(eco_tox.get('algae', ''))
+        other_eco = _val(eco_tox.get('other', ''))
+
+        if fish:
+            eco_parts.append(f"어류: {fish}")
+        if daphnia:
+            eco_parts.append(f"갑각류(물벼룩): {daphnia}")
+        if algae:
+            eco_parts.append(f"조류: {algae}")
+        if other_eco:
+            eco_parts.append(other_eco)
+        if eco_parts:
+            eco_lines.append(f"[{name}]\n" + "\n".join(eco_parts))
+
+        # 나. 잔류성 및 분해성
+        v = _val(env.get('persistence', ''))
+        if v:
+            persistence_lines.append(f"[{name}] {v}")
+
+        # 다. 생물 농축성
+        v = _val(env.get('bioaccumulation', ''))
+        if v:
+            bioaccum_lines.append(f"[{name}] {v}")
+
+        # 라. 토양 이동성
+        v = _val(env.get('soil_mobility', ''))
+        if v:
+            soil_lines.append(f"[{name}] {v}")
+
+        # 마. 기타 유해 영향
+        v = _val(env.get('other_effects', ''))
+        if v:
+            other_lines.append(f"[{name}] {v}")
+
+    # 세션 상태에 반영
+    s12 = st.session_state.section12_data
+
+    if eco_lines:
+        s12['가_생태독성'] = "\n".join(eco_lines)
+    if persistence_lines:
+        s12['나_잔류성_및_분해성'] = "\n".join(persistence_lines)
+    if bioaccum_lines:
+        s12['다_생물_농축성'] = "\n".join(bioaccum_lines)
+    if soil_lines:
+        s12['라_토양_이동성'] = "\n".join(soil_lines)
+    if other_lines:
+        s12['마_기타_유해_영향'] = "\n".join(other_lines)
+
+
 # ============================================================
 # KOSHA API 연동 섹션
 # ============================================================
 with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
     st.markdown("섹션 3에 등록된 CAS 번호로 환경 영향 정보를 자동 조회합니다.")
-    
+
     # 섹션 3에서 CAS 번호 가져오기
     cas_list = []
     materials_info = []
-    
+
     if 'section3_data' in st.session_state:
         for comp in st.session_state.get('section3_data', {}).get('components', []):
             if comp.get('CAS번호') and comp.get('물질명'):
@@ -77,25 +160,21 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                     'cas': comp['CAS번호'],
                     'content': comp.get('함유량(%)', '')
                 })
-    
+
     if cas_list:
         st.success(f"✅ 섹션 3에서 {len(cas_list)}개의 CAS 번호를 찾았습니다.")
         for mat in materials_info:
             st.write(f"  • **{mat['name']}** (CAS: {mat['cas']})")
-        
+
         if st.button("🔍 KOSHA API에서 환경 영향 정보 조회", type="primary", key="api_query_btn"):
             try:
-                # 프로젝트 루트에 kosha_api_extended.py 파일이 있어야 합니다
-                import sys
-                import os
-                # 현재 파일의 상위 디렉토리(프로젝트 루트)를 path에 추가
                 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 from kosha_api_extended import get_environmental_info, search_by_cas
                 import time
-                
+
                 with st.spinner("KOSHA API에서 데이터를 조회 중입니다..."):
                     api_results = []
-                    
+
                     for cas in cas_list:
                         search_result = search_by_cas(cas)
                         if search_result.get('success'):
@@ -115,29 +194,44 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                                 'error': search_result.get('error', '조회 실패')
                             })
                         time.sleep(0.3)
-                    
+
                     st.session_state['section12_api_results'] = api_results
+
+                    # ★ 핵심 수정: API 결과를 입력 필드에 자동 매핑
+                    apply_api_results_to_section12(api_results)
+
                     st.rerun()
-                    
+
             except ImportError:
                 st.error("❌ kosha_api_extended.py 모듈을 찾을 수 없습니다.")
             except Exception as e:
                 st.error(f"❌ API 조회 중 오류: {e}")
     else:
         st.warning("⚠️ 섹션 3에 CAS 번호가 등록된 구성성분이 없습니다.")
-    
+
     # API 결과 표시
     if 'section12_api_results' in st.session_state:
         st.markdown("---")
         st.markdown("**📊 조회 결과:**")
-        
+
         for result in st.session_state['section12_api_results']:
             if 'error' in result:
                 st.warning(f"⚠️ {result['cas']}: {result['error']}")
             else:
-                st.info(f"✅ **{result['name']}** (CAS: {result['cas']}) - 조회 완료")
-        
-        st.markdown("*위 정보를 참고하여 아래 양식을 작성하세요.*")
+                env = result.get('environmental', {})
+                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']}) - 상세 보기"):
+                    raw = env.get('raw_items', [])
+                    if raw:
+                        for item in raw:
+                            st.write(f"  • **{item['name']}**: {item['detail']}")
+                    else:
+                        st.write("  (raw_items 없음)")
+
+        # 수동 재적용 버튼
+        if st.button("📥 조회 결과를 입력란에 다시 적용", key="reapply_btn"):
+            apply_api_results_to_section12(st.session_state['section12_api_results'])
+            st.success("✅ API 조회 결과가 아래 입력란에 반영되었습니다.")
+            st.rerun()
 
 st.markdown("---")
 
