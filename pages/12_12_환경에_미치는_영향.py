@@ -147,7 +147,9 @@ def apply_api_results_to_section12(api_results):
     s12 = st.session_state.section12_data
     for fk, lines in all_field_data.items():
         if lines:
-            s12[fk] = "\n\n".join(lines)
+            new_val = "\n\n".join(lines)
+            s12[fk] = new_val
+            st.session_state[f"s12_{fk}"] = new_val
 
 
 # ============================================================
@@ -192,10 +194,6 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
 
                     st.session_state['section12_api_results'] = api_results
                     apply_api_results_to_section12(api_results)
-                    for k in list(st.session_state.section12_data.keys()):
-                        wk = f"s12_{k}"
-                        if wk in st.session_state:
-                            del st.session_state[wk]
                     st.rerun()
 
             except ImportError:
@@ -220,10 +218,6 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
 
         if st.button("📥 조회 결과를 입력란에 다시 적용", key="reapply_btn"):
             apply_api_results_to_section12(st.session_state['section12_api_results'])
-            for k in list(st.session_state.section12_data.keys()):
-                wk = f"s12_{k}"
-                if wk in st.session_state:
-                    del st.session_state[wk]
             st.success("✅ 반영 완료!")
             st.rerun()
 
