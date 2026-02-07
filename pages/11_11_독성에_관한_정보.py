@@ -231,13 +231,14 @@ def apply_api_results_to_section11(api_results):
     all_exposure = []
     all_health = {k: [] for k in st.session_state.section11_data['나_건강_유해성_정보']}
 
-    # ATE 프리필 초기화
-    ate_prefill = {'경구': {}, '경피': {}, '흡입': {}}
+    # ATE 프리필 초기화 — CAS 번호 기반으로 저장
+    ate_prefill_by_cas = {'경구': {}, '경피': {}, '흡입': {}}
 
     for result in api_results:
         if 'error' in result:
             continue
         name = result.get('name', result.get('cas', ''))
+        cas = result.get('cas', '')
         raw_items = result.get('toxicity', {}).get('raw_items', [])
         if not raw_items:
             continue
@@ -256,14 +257,13 @@ def apply_api_results_to_section11(api_results):
             elif field and field in mat_health:
                 mat_health[field].append(f"  ○ {item_name}: {item_detail}")
 
-                # ★ 급성독성 항목이면 숫자값도 추출하여 프리필
+                # ★ 급성독성 항목이면 숫자값도 추출하여 프리필 (CAS 기준)
                 route = _FIELD_TO_ROUTE.get(field)
-                if route:
+                if route and cas:
                     numeric_val = _extract_numeric(item_detail)
                     if numeric_val and numeric_val > 0:
-                        # 같은 물질 같은 경로에 여러 값 있으면 첫번째(보통 LD50)
-                        if name not in ate_prefill[route]:
-                            ate_prefill[route][name] = numeric_val
+                        if cas not in ate_prefill_by_cas[route]:
+                            ate_prefill_by_cas[route][cas] = numeric_val
 
         if mat_exposure:
             all_exposure.append(f"[{name}] " + " / ".join(mat_exposure))
@@ -283,21 +283,25 @@ def apply_api_results_to_section11(api_results):
             s11['나_건강_유해성_정보'][fk] = new_val
             st.session_state[f"s11_{fk}"] = new_val
 
-    # ★ ATE 프리필 값 저장 + 위젯키에도 반영
-    st.session_state.section11_ate_prefill = ate_prefill
+    # ★ ATE 프리필 값 저장 + 위젯키에도 반영 (CAS 기반 매칭)
+    st.session_state.section11_ate_prefill = ate_prefill_by_cas
 
-    # 섹션3 성분 목록과 매칭하여 위젯키 직접 설정
+    # 섹션3 성분의 CAS번호로 매칭하여 위젯키 직접 설정
     components_s3 = []
     if 'section3_data' in st.session_state:
         for comp in st.session_state.get('section3_data', {}).get('components', []):
             if comp.get('물질명'):
-                components_s3.append(comp['물질명'])
+                components_s3.append({
+                    'name': comp['물질명'],
+                    'cas': comp.get('CAS번호', '').strip(),
+                })
 
-    for route_kr, name_val_map in ate_prefill.items():
-        for i, comp_name in enumerate(components_s3):
-            if comp_name in name_val_map:
+    for route_kr, cas_val_map in ate_prefill_by_cas.items():
+        for i, comp_info in enumerate(components_s3):
+            comp_cas = comp_info['cas']
+            if comp_cas and comp_cas in cas_val_map:
                 wk = f"ate_{route_kr}_atei_{i}"
-                st.session_state[wk] = name_val_map[comp_name]
+                st.session_state[wk] = cas_val_map[comp_cas]
 
 
 # ============================================================
@@ -562,12 +566,12 @@ for field_key, label, route, placeholder in ACUTE_ITEMS:
 
         d_name = components_from_s3[i]['name'] if i < len(components_from_s3) else ''
         d_pct = components_from_s3[i]['pct'] if i < len(components_from_s3) else 0.0
+        d_cas = components_from_s3[i]['cas'] if i < len(components_from_s3) else ''
 
-        # ATE 기본값: 위젯키에 이미 있으면 그걸 쓰고, 없으면 프리필
+        # ATE 기본값: 위젯키에 이미 있으면 그걸 쓰고, 없으면 CAS로 프리필
         ate_widget_key = f"ate_{route}_atei_{i}"
         if ate_widget_key not in st.session_state:
-            # 프리필에서 찾기
-            d_ate = prefill.get(d_name, 0.0)
+            d_ate = prefill.get(d_cas, 0.0) if d_cas else 0.0
             if d_ate > 0:
                 st.session_state[ate_widget_key] = d_ate
 
