@@ -40,7 +40,7 @@ if 'section15_data' not in st.session_state:
 def _is_valid(detail):
     if not detail:
         return False
-    return detail.strip() not in ("자료없음", "해당없음", "")
+    return detail.strip() not in ("자료없음", "해당없음", "(없음)", "")
 
 
 def _classify_item_s15(item_name):
@@ -113,7 +113,10 @@ def apply_api_results_to_section15(api_results):
     s15 = st.session_state.section15_data
     for fk, lines in all_field_data.items():
         if lines:
-            s15[fk] = "\n\n".join(lines)
+            new_val = "\n\n".join(lines)
+            s15[fk] = new_val
+            # ★ 핵심: widget key도 직접 업데이트해야 Streamlit이 반영함
+            st.session_state[f"s15_{fk}"] = new_val
 
 
 # ============================================================
