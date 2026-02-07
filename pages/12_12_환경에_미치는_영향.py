@@ -57,7 +57,7 @@ PARENT_HEADERS = {'생태독성', '잔류성 및 분해성', '생물농축성', 
 def _is_valid(detail):
     if not detail:
         return False
-    return detail.strip() not in ("자료없음", "해당없음", "")
+    return detail.strip() not in ("자료없음", "해당없음", "(없음)", "")
 
 
 def _classify_item(item_name):
@@ -192,6 +192,10 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
 
                     st.session_state['section12_api_results'] = api_results
                     apply_api_results_to_section12(api_results)
+                    for k in list(st.session_state.section12_data.keys()):
+                        wk = f"s12_{k}"
+                        if wk in st.session_state:
+                            del st.session_state[wk]
                     st.rerun()
 
             except ImportError:
@@ -216,6 +220,10 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
 
         if st.button("📥 조회 결과를 입력란에 다시 적용", key="reapply_btn"):
             apply_api_results_to_section12(st.session_state['section12_api_results'])
+            for k in list(st.session_state.section12_data.keys()):
+                wk = f"s12_{k}"
+                if wk in st.session_state:
+                    del st.session_state[wk]
             st.success("✅ 반영 완료!")
             st.rerun()
 
