@@ -78,7 +78,7 @@ PARENT_HEADERS_11 = {'건강 유해성 정보', '건강유해성정보', '급성
 def _is_valid(detail):
     if not detail:
         return False
-    return detail.strip() not in ("자료없음", "해당없음", "")
+    return detail.strip() not in ("자료없음", "해당없음", "(없음)", "")
 
 
 def _classify_item_s11(item_name):
@@ -238,6 +238,13 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
 
                     st.session_state['section11_api_results'] = api_results
                     apply_api_results_to_section11(api_results)
+                    # ★ widget key 삭제 → rerun 시 value= 에서 새 값 로드
+                    if "exposure_routes" in st.session_state:
+                        del st.session_state["exposure_routes"]
+                    for k in list(st.session_state.section11_data.get('나_건강_유해성_정보', {}).keys()):
+                        wk = f"s11_{k}"
+                        if wk in st.session_state:
+                            del st.session_state[wk]
                     st.rerun()
 
             except ImportError:
@@ -262,6 +269,12 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
 
         if st.button("📥 조회 결과를 입력란에 다시 적용", key="reapply_btn"):
             apply_api_results_to_section11(st.session_state['section11_api_results'])
+            if "exposure_routes" in st.session_state:
+                del st.session_state["exposure_routes"]
+            for k in list(st.session_state.section11_data.get('나_건강_유해성_정보', {}).keys()):
+                wk = f"s11_{k}"
+                if wk in st.session_state:
+                    del st.session_state[wk]
             st.success("✅ 반영 완료!")
             st.rerun()
 
