@@ -1,260 +1,381 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import io
+import sys
+import os
 
-# 페이지 설정
 st.set_page_config(
-    page_title="MSDS 섹션 3 - 구성성분의 명칭 및 함유량",
+    page_title="MSDS 섹션 11 - 독성에 관한 정보",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 스타일 적용
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap');
-    
-    * {
-        font-family: 'Nanum Gothic', sans-serif !important;
-    }
-    
-    .stTextInput > div > div > input {
-        background-color: #f0f0f0;
-        font-family: 'Nanum Gothic', sans-serif !important;
-    }
-    .section-header {
-        background-color: #d3e3f3;
-        padding: 10px;
-        border-radius: 5px;
-        margin-bottom: 20px;
-        font-family: 'Nanum Gothic', sans-serif !important;
-    }
-    /* 테이블 스타일 */
-    .dataframe {
-        font-family: 'Nanum Gothic', sans-serif !important;
-    }
-    .stDataFrame {
-        font-family: 'Nanum Gothic', sans-serif !important;
-    }
+    * { font-family: 'Nanum Gothic', sans-serif !important; }
+    .stTextInput > div > div > input { background-color: #f0f0f0; }
+    .stTextArea > div > div > textarea { background-color: #f0f0f0; }
+    .section-header { background-color: #d3e3f3; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+    .subsection-header { background-color: #e8f0f7; padding: 8px; border-radius: 3px; margin: 15px 0; font-weight: bold; }
+    .sub-item { background-color: #f5f5f5; padding: 5px 10px; margin: 5px 0; border-left: 3px solid #1976d2; }
 </style>
 """, unsafe_allow_html=True)
 
-# 제목
-st.markdown('<div class="section-header"><h2>3. 구성성분의 명칭 및 함유량</h2></div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header"><h2>11. 독성에 관한 정보</h2></div>', unsafe_allow_html=True)
 
-# 세션 상태 초기화
-if 'section3_data' not in st.session_state:
-    st.session_state.section3_data = {
-        'components': [
-            {'물질명': '', '관용명(이명)': '', 'CAS번호': '', '함유량(%)': ''},
-            {'물질명': '', '관용명(이명)': '', 'CAS번호': '', '함유량(%)': ''},
-            {'물질명': '', '관용명(이명)': '', 'CAS번호': '', '함유량(%)': ''},
-        ]
+if 'section11_data' not in st.session_state:
+    st.session_state.section11_data = {
+        '가_가능성이_높은_노출_경로에_관한_정보': '',
+        '나_건강_유해성_정보': {
+            '급성_독성_경구': '',
+            '급성_독성_경피': '',
+            '급성_독성_흡입': '',
+            '피부_부식성_또는_자극성': '',
+            '심한_눈_손상_또는_자극성': '',
+            '호흡기_과민성': '',
+            '피부_과민성': '',
+            '발암성': '',
+            '생식세포_변이원성': '',
+            '생식독성': '',
+            '특정_표적장기_독성_1회_노출': '',
+            '특정_표적장기_독성_반복_노출': '',
+            '흡인_유해성': ''
+        }
     }
 
-# 현재 성분 개수
-num_components = len(st.session_state.section3_data['components'])
+# 기존 데이터가 문자열이면 딕셔너리로 변환
+if isinstance(st.session_state.section11_data.get('나_건강_유해성_정보'), str):
+    old = st.session_state.section11_data.get('나_건강_유해성_정보', '')
+    st.session_state.section11_data['나_건강_유해성_정보'] = {
+        '급성_독성_경구': old, '급성_독성_경피': '', '급성_독성_흡입': '',
+        '피부_부식성_또는_자극성': '', '심한_눈_손상_또는_자극성': '',
+        '호흡기_과민성': '', '피부_과민성': '', '발암성': '', '생식세포_변이원성': '',
+        '생식독성': '', '특정_표적장기_독성_1회_노출': '', '특정_표적장기_독성_반복_노출': '',
+        '흡인_유해성': ''
+    }
 
-# 버튼 컨테이너
-button_col1, button_col2, button_col3 = st.columns([1, 1, 8])
-with button_col1:
-    if st.button("➕ 성분 추가", type="primary"):
-        st.session_state.section3_data['components'].append(
-            {'물질명': '', '관용명(이명)': '', 'CAS번호': '', '함유량(%)': ''}
-        )
-        st.rerun()
+# 기존 '급성_독성' 단일 키가 있으면 경구/경피/흡입으로 마이그레이션
+_health = st.session_state.section11_data.get('나_건강_유해성_정보', {})
+if '급성_독성' in _health and '급성_독성_경구' not in _health:
+    old_val = _health.pop('급성_독성', '')
+    _health['급성_독성_경구'] = old_val
+    _health.setdefault('급성_독성_경피', '')
+    _health.setdefault('급성_독성_흡입', '')
+elif '급성_독성' in _health:
+    _health.pop('급성_독성', None)
+# 누락 키 보충
+for _k in ('급성_독성_경구', '급성_독성_경피', '급성_독성_흡입'):
+    _health.setdefault(_k, '')
 
-with button_col2:
-    if st.button("➖ 성분 삭제") and num_components > 1:
-        st.session_state.section3_data['components'].pop()
-        st.rerun()
 
-# 구성성분 입력 테이블
-st.markdown("### 구성성분 정보")
+# ============================================================
+# raw_items 기반 매핑
+# ============================================================
+# API 응답의 raw_items name 예시:
+#   가능성이 높은 노출 경로에 관한 정보 / 노출경로
+#   급성 독성-경구 / 경구 / 급성독성(경구) → 급성_독성_경구
+#   급성 독성-경피 / 경피              → 급성_독성_경피
+#   급성 독성-흡입 / 흡입 / 흡입(가스) / 흡입(증기) / 흡입(분진/미스트) → 급성_독성_흡입
+#   피부 부식성/자극성 / 피부부식성 또는 자극성
+#   심한 눈 손상/자극성 / 눈 손상 또는 자극성
+#   호흡기 과민성 / 호흡기과민성
+#   피부 과민성 / 피부과민성
+#   발암성
+#   생식세포 변이원성
+#   생식독성
+#   특정 표적장기 독성(1회 노출) / 특정표적장기독성(단일노출)
+#   특정 표적장기 독성(반복 노출)
+#   흡인 유해성
 
-# 헤더
-header_cols = st.columns([2, 2, 2, 1])
-with header_cols[0]:
-    st.markdown("**물질명**")
-with header_cols[1]:
-    st.markdown("**관용명(이명)**")
-with header_cols[2]:
-    st.markdown("**CAS번호**")
-with header_cols[3]:
-    st.markdown("**함유량(%)**")
+# 부모 헤더 (값이 "자료없음"인 상위 항목)
+PARENT_HEADERS_11 = {'건강 유해성 정보', '건강유해성정보'}
 
-# 구분선
-st.markdown("---")
+def _is_valid(detail):
+    if not detail:
+        return False
+    return detail.strip() not in ("자료없음", "해당없음", "(없음)", "")
 
-# 각 성분에 대한 입력 필드
-for idx, component in enumerate(st.session_state.section3_data['components']):
-    cols = st.columns([2, 2, 2, 1])
-    
-    with cols[0]:
-        component['물질명'] = st.text_input(
-            f"물질명 {idx+1}",
-            value=component['물질명'],
-            key=f"material_{idx}",
-            label_visibility="collapsed"
-        )
-    
-    with cols[1]:
-        component['관용명(이명)'] = st.text_input(
-            f"관용명 {idx+1}",
-            value=component['관용명(이명)'],
-            key=f"common_name_{idx}",
-            label_visibility="collapsed"
-        )
-    
-    with cols[2]:
-        component['CAS번호'] = st.text_input(
-            f"CAS번호 {idx+1}",
-            value=component['CAS번호'],
-            key=f"cas_{idx}",
-            placeholder="예: 7732-18-5",
-            label_visibility="collapsed"
-        )
-    
-    with cols[3]:
-        component['함유량(%)'] = st.text_input(
-            f"함유량 {idx+1}",
-            value=component['함유량(%)'],
-            key=f"content_{idx}",
-            placeholder="예: 10-20",
-            label_visibility="collapsed"
-        )
 
-# 합계 계산 (함유량이 단일 숫자인 경우에만)
-st.markdown("---")
-try:
-    total = 0
-    valid_percentages = []
-    for comp in st.session_state.section3_data['components']:
-        if comp['함유량(%)'] and '-' not in comp['함유량(%)']:
+def _classify_item_s11(item_name):
+    """raw_item name으로 section11 필드 분류"""
+    n = item_name.strip()
+
+    if n in PARENT_HEADERS_11:
+        return None
+
+    # 가. 노출 경로
+    if '노출' in n and '경로' in n:
+        return 'exposure'
+
+    # 급성 독성 - 경구
+    if ('급성' in n and '독성' in n and '경구' in n) or n == '경구':
+        return '급성_독성_경구'
+    if '경구' in n and ('LD50' in n or 'LD' in n or '독성' in n or 'ATE' in n):
+        return '급성_독성_경구'
+
+    # 급성 독성 - 경피
+    if ('급성' in n and '독성' in n and '경피' in n) or n == '경피':
+        return '급성_독성_경피'
+    if '경피' in n and ('LD50' in n or 'LD' in n or '독성' in n or 'ATE' in n):
+        return '급성_독성_경피'
+
+    # 급성 독성 - 흡입
+    if ('급성' in n and '독성' in n and '흡입' in n) or n in ('흡입', '흡입(가스)', '흡입(증기)', '흡입(분진/미스트)'):
+        return '급성_독성_흡입'
+    if '흡입' in n and ('LC50' in n or 'LC' in n or '독성' in n or 'ATE' in n):
+        return '급성_독성_흡입'
+
+    # 급성 독성 - 경로 구분 불가 시 경구로 기본 배치
+    if '급성' in n and '독성' in n:
+        return '급성_독성_경구'
+
+    # 피부 부식성/자극성 (피부 과민성과 구분!)
+    if '피부' in n and ('부식' in n or '자극' in n) and '과민' not in n:
+        return '피부_부식성_또는_자극성'
+
+    # 심한 눈 손상/자극성
+    if '눈' in n and ('손상' in n or '자극' in n):
+        return '심한_눈_손상_또는_자극성'
+
+    # 호흡기 과민성
+    if '호흡기' in n and '과민' in n:
+        return '호흡기_과민성'
+
+    # 피부 과민성
+    if '피부' in n and '과민' in n:
+        return '피부_과민성'
+
+    # 발암성
+    if '발암' in n:
+        return '발암성'
+
+    # 생식세포 변이원성
+    if '생식세포' in n and '변이' in n:
+        return '생식세포_변이원성'
+
+    # 생식독성
+    if '생식독성' in n or ('생식' in n and '독성' in n):
+        return '생식독성'
+
+    # 특정 표적장기 독성 (1회)
+    if '표적' in n and '장기' in n and ('1회' in n or '단일' in n):
+        return '특정_표적장기_독성_1회_노출'
+
+    # 특정 표적장기 독성 (반복)
+    if '표적' in n and '장기' in n and '반복' in n:
+        return '특정_표적장기_독성_반복_노출'
+
+    # 특정 표적장기 독성 (구분 못하면 1회로 일단 배치)
+    if '표적' in n and '장기' in n:
+        return '특정_표적장기_독성_1회_노출'
+
+    # 흡인 유해성
+    if '흡인' in n and '유해' in n:
+        return '흡인_유해성'
+
+    return None
+
+
+def apply_api_results_to_section11(api_results):
+    """raw_items를 직접 분류하여 section11_data에 매핑"""
+    all_exposure = []
+    all_health = {k: [] for k in st.session_state.section11_data['나_건강_유해성_정보']}
+
+    for result in api_results:
+        if 'error' in result:
+            continue
+
+        name = result.get('name', result.get('cas', ''))
+        raw_items = result.get('toxicity', {}).get('raw_items', [])
+        if not raw_items:
+            continue
+
+        # 물질별 분류
+        mat_exposure = []
+        mat_health = {k: [] for k in all_health}
+
+        for item in raw_items:
+            item_name = item.get('name', '').strip()
+            item_detail = item.get('detail', '').strip()
+
+            if not _is_valid(item_detail):
+                continue
+
+            field = _classify_item_s11(item_name)
+
+            if field == 'exposure':
+                mat_exposure.append(item_detail)
+            elif field and field in mat_health:
+                mat_health[field].append(f"  ○ {item_name}: {item_detail}")
+
+        # 노출 경로
+        if mat_exposure:
+            all_exposure.append(f"[{name}] " + " / ".join(mat_exposure))
+
+        # 건강 유해성
+        for fk in all_health:
+            if mat_health[fk]:
+                all_health[fk].append(f"[{name}]\n" + "\n".join(mat_health[fk]))
+
+    # 세션 상태 반영
+    s11 = st.session_state.section11_data
+    if all_exposure:
+        new_val = "\n".join(all_exposure)
+        s11['가_가능성이_높은_노출_경로에_관한_정보'] = new_val
+        st.session_state["exposure_routes"] = new_val
+
+    for fk, lines in all_health.items():
+        if lines:
+            new_val = "\n\n".join(lines)
+            s11['나_건강_유해성_정보'][fk] = new_val
+            st.session_state[f"s11_{fk}"] = new_val
+
+
+# ============================================================
+# KOSHA API 연동 섹션
+# ============================================================
+with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
+    st.markdown("섹션 3에 등록된 CAS 번호로 독성 정보를 자동 조회합니다.")
+
+    cas_list = []
+    materials_info = []
+
+    if 'section3_data' in st.session_state:
+        for comp in st.session_state.get('section3_data', {}).get('components', []):
+            if comp.get('CAS번호') and comp.get('물질명'):
+                cas_list.append(comp['CAS번호'])
+                materials_info.append({'name': comp['물질명'], 'cas': comp['CAS번호']})
+
+    if cas_list:
+        st.success(f"✅ 섹션 3에서 {len(cas_list)}개의 CAS 번호를 찾았습니다.")
+        for mat in materials_info:
+            st.write(f"  • **{mat['name']}** (CAS: {mat['cas']})")
+
+        if st.button("🔍 KOSHA API에서 독성 정보 조회", type="primary", key="api_query_btn"):
             try:
-                val = float(comp['함유량(%)'])
-                valid_percentages.append(val)
-                total += val
-            except:
-                pass
-    
-    if valid_percentages:
-        st.info(f"📊 입력된 함유량 합계: {total:.1f}%")
-        if abs(total - 100) > 0.1:
-            st.warning(f"⚠️ 함유량 합계가 100%가 아닙니다. 확인이 필요합니다.")
-except:
-    pass
+                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                from kosha_api_extended import get_toxicity_info, search_by_cas
+                import time
 
-# 엑셀 업로드 기능
-st.markdown("### 엑셀 파일로 가져오기")
+                with st.spinner("KOSHA API에서 데이터를 조회 중입니다..."):
+                    api_results = []
+                    for cas in cas_list:
+                        search_result = search_by_cas(cas)
+                        if search_result.get('success'):
+                            chem_id = search_result['chemId']
+                            chem_name = search_result.get('chemNameKor', cas)
+                            time.sleep(0.3)
+                            toxicity = get_toxicity_info(chem_id)
+                            api_results.append({'cas': cas, 'name': chem_name, 'toxicity': toxicity})
+                        else:
+                            api_results.append({'cas': cas, 'name': cas, 'error': search_result.get('error', '조회 실패')})
+                        time.sleep(0.3)
 
-# 템플릿 다운로드 버튼
-col1, col2 = st.columns([1, 3])
-with col1:
-    # 템플릿 생성
-    template_df = pd.DataFrame({
-        '물질명': ['물질명을 입력하세요', '예: 에탄올', '예: 메탄올'],
-        '관용명(이명)': ['관용명 또는 이명', '예: 에틸알코올', '예: 메틸알코올'],
-        'CAS번호': ['CAS 번호 입력', '64-17-5', '67-56-1'],
-        '함유량(%)': ['함유량 또는 범위', '40-50', '10-20']
-    })
-    
-    # 엑셀 파일 생성
-    import io
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        template_df.to_excel(writer, sheet_name='구성성분', index=False)
-        
-        # 워크시트 가져오기
-        worksheet = writer.sheets['구성성분']
-        
-        # 컬럼 너비 조정
-        worksheet.column_dimensions['A'].width = 25
-        worksheet.column_dimensions['B'].width = 25
-        worksheet.column_dimensions['C'].width = 20
-        worksheet.column_dimensions['D'].width = 15
-    
-    buffer.seek(0)
-    
-    st.download_button(
-        label="📥 템플릿 다운로드",
-        data=buffer,
-        file_name="MSDS_구성성분_템플릿.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        help="구성성분 정보를 입력할 수 있는 엑셀 템플릿을 다운로드합니다."
+                    st.session_state['section11_api_results'] = api_results
+                    apply_api_results_to_section11(api_results)
+                    st.rerun()
+
+            except ImportError:
+                st.error("❌ kosha_api_extended.py 모듈을 찾을 수 없습니다.")
+            except Exception as e:
+                st.error(f"❌ API 조회 중 오류: {e}")
+    else:
+        st.warning("⚠️ 섹션 3에 CAS 번호가 등록된 구성성분이 없습니다.")
+
+    if 'section11_api_results' in st.session_state:
+        st.markdown("---")
+        st.markdown("**📊 조회 결과 (API 원본):**")
+        for result in st.session_state['section11_api_results']:
+            if 'error' in result:
+                st.warning(f"⚠️ {result['cas']}: {result['error']}")
+            else:
+                tox = result.get('toxicity', {})
+                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']})"):
+                    for item in tox.get('raw_items', []):
+                        marker = "🔹" if _is_valid(item['detail']) else "⬜"
+                        st.write(f"  {marker} **{item['name']}**: {item['detail']}")
+
+        if st.button("📥 조회 결과를 입력란에 다시 적용", key="reapply_btn"):
+            apply_api_results_to_section11(st.session_state['section11_api_results'])
+            st.success("✅ 반영 완료!")
+            st.rerun()
+
+st.markdown("---")
+
+# ============================================================
+# 입력 필드
+# ============================================================
+
+# 가. 노출 경로
+st.markdown('<div class="subsection-header">가. 가능성이 높은 노출 경로에 관한 정보</div>', unsafe_allow_html=True)
+가_val = st.text_area(
+    "노출 경로",
+    value=st.session_state.section11_data.get('가_가능성이_높은_노출_경로에_관한_정보', ''),
+    height=100,
+    placeholder="예: 흡입, 피부 접촉, 눈 접촉, 경구",
+    key="exposure_routes",
+    label_visibility="collapsed"
+)
+st.session_state.section11_data['가_가능성이_높은_노출_경로에_관한_정보'] = 가_val
+
+# 나. 건강 유해성 정보
+st.markdown('<div class="subsection-header">나. 건강 유해성 정보</div>', unsafe_allow_html=True)
+
+health_items = [
+    ('급성_독성_경구', '○ 급성 독성 - 경구 (Oral)',
+     "예: LD50 (경구, 랫드): > 2000 mg/kg\nATE(경구): > 5000 mg/kg"),
+    ('급성_독성_경피', '○ 급성 독성 - 경피 (Dermal)',
+     "예: LD50 (경피, 토끼): > 2000 mg/kg\nATE(경피): > 5000 mg/kg"),
+    ('급성_독성_흡입', '○ 급성 독성 - 흡입 (Inhalation)',
+     "예: LC50 (흡입, 랫드, 4hr): > 5 mg/L (증기)\nATE(흡입): > 20 mg/L"),
+    ('피부_부식성_또는_자극성', '○ 피부 부식성 또는 자극성',
+     "예: 피부에 자극을 일으킴 (구분 2)"),
+    ('심한_눈_손상_또는_자극성', '○ 심한 눈 손상 또는 자극성',
+     "예: 눈에 심한 자극을 일으킴 (구분 2A)"),
+    ('호흡기_과민성', '○ 호흡기 과민성',
+     "예: 흡입 시 알레르기성 반응을 일으킬 수 있음"),
+    ('피부_과민성', '○ 피부 과민성',
+     "예: 알레르기성 피부 반응을 일으킬 수 있음"),
+    ('발암성', '○ 발암성',
+     "예: IARC: Group 1 / ACGIH: A1"),
+    ('생식세포_변이원성', '○ 생식세포 변이원성',
+     "예: 유전적인 결함을 일으킬 수 있음 (구분 1B)"),
+    ('생식독성', '○ 생식독성',
+     "예: 태아 또는 생식능력에 손상을 일으킬 수 있음"),
+    ('특정_표적장기_독성_1회_노출', '○ 특정 표적장기 독성 (1회 노출)',
+     "예: 호흡기계 자극을 일으킬 수 있음 (구분 3)"),
+    ('특정_표적장기_독성_반복_노출', '○ 특정 표적장기 독성 (반복 노출)',
+     "예: 장기간 노출되면 간에 손상을 일으킬 수 있음 (구분 2)"),
+    ('흡인_유해성', '○ 흡인 유해성',
+     "예: 삼켜서 기도로 유입되면 치명적일 수 있음 (구분 1)"),
+]
+
+for key, label, placeholder in health_items:
+    st.markdown(f'<div class="sub-item">{label}</div>', unsafe_allow_html=True)
+    val = st.text_area(
+        label,
+        value=st.session_state.section11_data['나_건강_유해성_정보'].get(key, ''),
+        height=80,
+        placeholder=placeholder,
+        key=f"s11_{key}",
+        label_visibility="collapsed"
     )
+    st.session_state.section11_data['나_건강_유해성_정보'][key] = val
 
-with col2:
-    uploaded_file = st.file_uploader(
-        "구성성분 정보가 포함된 엑셀 파일을 업로드하세요",
-        type=['xlsx', 'xls'],
-        help="엑셀 파일은 '물질명', '관용명(이명)', 'CAS번호', '함유량(%)' 열을 포함해야 합니다."
-    )
+st.info("💡 **참고**: 가.항 및 나.항을 합쳐서 노출 경로와 건강 유해성 정보를 함께 기재할 수 있습니다.")
 
-if uploaded_file is not None:
-    try:
-        df = pd.read_excel(uploaded_file)
-        # 필요한 컬럼이 있는지 확인
-        required_cols = ['물질명', '관용명(이명)', 'CAS번호', '함유량(%)']
-        
-        # 컬럼명 정규화 (공백 제거 등)
-        df.columns = df.columns.str.strip()
-        
-        if all(col in df.columns for col in required_cols):
-            # 데이터를 세션 상태로 변환
-            components_list = []
-            for _, row in df.iterrows():
-                components_list.append({
-                    '물질명': str(row['물질명']) if pd.notna(row['물질명']) else '',
-                    '관용명(이명)': str(row['관용명(이명)']) if pd.notna(row['관용명(이명)']) else '',
-                    'CAS번호': str(row['CAS번호']) if pd.notna(row['CAS번호']) else '',
-                    '함유량(%)': str(row['함유량(%)']) if pd.notna(row['함유량(%)']) else ''
-                })
-            
-            if st.button("엑셀 데이터 적용"):
-                # 기존 위젯 키 모두 제거 (이전 성분 개수만큼)
-                old_count = len(st.session_state.section3_data.get('components', []))
-                for old_idx in range(old_count):
-                    for wk in [f"material_{old_idx}", f"common_name_{old_idx}", f"cas_{old_idx}", f"content_{old_idx}"]:
-                        if wk in st.session_state:
-                            del st.session_state[wk]
-                # 데이터 딕셔너리 업데이트
-                st.session_state.section3_data['components'] = components_list
-                # 새 위젯 키 설정
-                for i, comp in enumerate(components_list):
-                    st.session_state[f"material_{i}"] = comp['물질명']
-                    st.session_state[f"common_name_{i}"] = comp['관용명(이명)']
-                    st.session_state[f"cas_{i}"] = comp['CAS번호']
-                    st.session_state[f"content_{i}"] = comp['함유량(%)']
-                st.success(f"✅ {len(components_list)}개의 성분 정보를 가져왔습니다!")
-                st.rerun()
-        else:
-            st.error("❌ 엑셀 파일에 필요한 컬럼이 없습니다. '물질명', '관용명(이명)', 'CAS번호', '함유량(%)' 컬럼이 필요합니다.")
-            st.info("현재 엑셀 파일의 컬럼: " + ", ".join(df.columns.tolist()))
-    except Exception as e:
-        st.error(f"❌ 파일을 읽는 중 오류가 발생했습니다: {str(e)}")
-
-# 저장 버튼
 st.markdown("---")
 col1, col2, col3 = st.columns([1, 1, 1])
 with col2:
-    if st.button("섹션 3 저장", type="primary", use_container_width=True):
-        # 빈 행 제거
-        cleaned_components = [
-            comp for comp in st.session_state.section3_data['components'] 
-            if any(comp.values())
-        ]
-        
-        if cleaned_components:
-            st.session_state.section3_data['components'] = cleaned_components
-            st.success("✅ 섹션 3이 저장되었습니다!")
-        else:
-            st.warning("⚠️ 최소 하나 이상의 성분 정보를 입력해주세요.")
+    if st.button("섹션 11 저장", type="primary", use_container_width=True):
+        st.success("✅ 섹션 11이 저장되었습니다!")
 
-# 데이터 미리보기
 with st.expander("저장된 데이터 확인"):
-    if st.session_state.section3_data['components']:
-        # DataFrame으로 표시
-        df_display = pd.DataFrame(st.session_state.section3_data['components'])
-        st.table(df_display)
+    st.write("**가. 노출 경로**")
+    st.text(st.session_state.section11_data.get('가_가능성이_높은_노출_경로에_관한_정보', '') or '(미입력)')
+    st.write("\n**나. 건강 유해성 정보**")
+    for key, label, _ in health_items:
+        val = st.session_state.section11_data['나_건강_유해성_정보'].get(key, '')
+        st.write(f"  {label}: {val or '(미입력)'}")
+    st.json(st.session_state.section11_data)
