@@ -15,11 +15,11 @@ st.set_page_config(
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap');
-    
+
     * {
         font-family: 'Nanum Gothic', sans-serif !important;
     }
-    
+
     .stTextInput > div > div > input {
         background-color: #f0f0f0;
         font-family: 'Nanum Gothic', sans-serif !important;
@@ -59,16 +59,151 @@ if 'section15_data' not in st.session_state:
         '바_기타_국내_및_외국법에_의한_규제': ''
     }
 
+
+# ============================================================
+# API 결과 → 입력 필드 자동 매핑 헬퍼 함수
+# ============================================================
+def _val(text):
+    """자료없음/해당없음이면 빈 문자열 반환"""
+    if not text or text.strip() in ("자료없음", "해당없음", ""):
+        return ""
+    return text.strip()
+
+
+def _build_osha_text(name, osha_data):
+    """산업안전보건법 데이터를 사람이 읽기 좋은 텍스트로 변환"""
+    lines = [f"[{name}]"]
+
+    label_map = {
+        'measurement': '작업환경측정대상물질',
+        'health_check': '특수건강진단대상물질',
+        'managed_hazard': '관리대상유해물질',
+        'special_managed': '특별관리물질',
+        'exposure_limit': '노출기준설정물질',
+        'permission': '허가대상물질',
+        'prohibited': '제조등금지물질',
+    }
+
+    for key, label in label_map.items():
+        val = osha_data.get(key, 'X')
+        status = "해당" if val == "O" else "해당없음"
+        lines.append(f"  • {label}: {status}")
+
+    # raw_text가 있으면 참고용으로 추가
+    raw = _val(osha_data.get('raw_text', ''))
+    if raw:
+        lines.append(f"  (원문: {raw})")
+
+    return "\n".join(lines)
+
+
+def _build_chem_control_text(name, cc_data):
+    """화학물질관리법 데이터를 텍스트로 변환"""
+    lines = [f"[{name}]"]
+
+    label_map = {
+        'toxic': '유독물질',
+        'permitted': '허가물질',
+        'restricted': '제한물질',
+        'prohibited': '금지물질',
+        'accident': '사고대비물질',
+    }
+
+    for key, label in label_map.items():
+        val = cc_data.get(key, 'X')
+        status = "해당" if val == "O" else "해당없음"
+        lines.append(f"  • {label}: {status}")
+
+    raw = _val(cc_data.get('raw_text', ''))
+    if raw:
+        lines.append(f"  (원문: {raw})")
+
+    return "\n".join(lines)
+
+
+def apply_api_results_to_section15(api_results):
+    """
+    API 조회 결과를 section15_data 세션 상태에 매핑합니다.
+    """
+    osha_lines = []
+    chem_control_lines = []
+    chem_reg_lines = []
+    hazmat_lines = []
+    waste_lines = []
+    other_lines = []
+
+    for result in api_results:
+        if 'error' in result:
+            continue
+
+        name = result.get('name', result.get('cas', ''))
+        regs = result.get('regulations', {})
+
+        # 가. 산업안전보건법
+        osha = regs.get('occupational_safety', {})
+        # O가 하나라도 있는지 또는 raw_text가 있는지 확인
+        has_osha = any(osha.get(k) == "O" for k in
+                       ['measurement', 'health_check', 'managed_hazard',
+                        'special_managed', 'exposure_limit', 'permission', 'prohibited'])
+        has_osha = has_osha or bool(_val(osha.get('raw_text', '')))
+        if has_osha:
+            osha_lines.append(_build_osha_text(name, osha))
+
+        # 나. 화학물질관리법
+        cc = regs.get('chemical_control', {})
+        has_cc = any(cc.get(k) == "O" for k in
+                     ['toxic', 'permitted', 'restricted', 'prohibited', 'accident'])
+        has_cc = has_cc or bool(_val(cc.get('raw_text', '')))
+        if has_cc:
+            chem_control_lines.append(_build_chem_control_text(name, cc))
+
+        # 다. 화학물질의 등록 및 평가 등에 관한 법률
+        v = _val(regs.get('chemical_registration', ''))
+        if v:
+            chem_reg_lines.append(f"[{name}] {v}")
+
+        # 라. 위험물안전관리법
+        v = _val(regs.get('hazardous_materials', ''))
+        if v:
+            hazmat_lines.append(f"[{name}] {v}")
+
+        # 마. 폐기물관리법
+        v = _val(regs.get('waste_management', ''))
+        if v:
+            waste_lines.append(f"[{name}] {v}")
+
+        # 바. 기타
+        v = _val(regs.get('other_regulations', ''))
+        if v:
+            other_lines.append(f"[{name}] {v}")
+
+    # 세션 상태에 반영
+    s15 = st.session_state.section15_data
+
+    if osha_lines:
+        s15['가_산업안전보건법에_의한_규제'] = "\n\n".join(osha_lines)
+    if chem_control_lines:
+        s15['나_화학물질관리법에_의한_규제'] = "\n\n".join(chem_control_lines)
+    if chem_reg_lines:
+        s15['다_화학물질의_등록_및_평가_등에_관한_법률에_의한_규제'] = "\n".join(chem_reg_lines)
+    if hazmat_lines:
+        s15['라_위험물안전관리법에_의한_규제'] = "\n".join(hazmat_lines)
+    if waste_lines:
+        s15['마_폐기물관리법에_의한_규제'] = "\n".join(waste_lines)
+    if other_lines:
+        s15['바_기타_국내_및_외국법에_의한_규제'] = "\n".join(other_lines)
+
+
 # ============================================================
 # KOSHA API 연동 섹션
 # ============================================================
 with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
     st.markdown("섹션 3에 등록된 CAS 번호로 법적 규제현황을 자동 조회합니다.")
-    
+
     # 섹션 3에서 CAS 번호 가져오기
     cas_list = []
     materials_info = []
-    
+
     if 'section3_data' in st.session_state:
         for comp in st.session_state.get('section3_data', {}).get('components', []):
             if comp.get('CAS번호') and comp.get('물질명'):
@@ -78,25 +213,21 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                     'cas': comp['CAS번호'],
                     'content': comp.get('함유량(%)', '')
                 })
-    
+
     if cas_list:
         st.success(f"✅ 섹션 3에서 {len(cas_list)}개의 CAS 번호를 찾았습니다.")
         for mat in materials_info:
             st.write(f"  • **{mat['name']}** (CAS: {mat['cas']})")
-        
+
         if st.button("🔍 KOSHA API에서 법적 규제현황 조회", type="primary", key="api_query_btn"):
             try:
-                # 프로젝트 루트에 kosha_api_extended.py 파일이 있어야 합니다
-                import sys
-                import os
-                # 현재 파일의 상위 디렉토리(프로젝트 루트)를 path에 추가
                 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 from kosha_api_extended import get_legal_regulations, search_by_cas
                 import time
-                
+
                 with st.spinner("KOSHA API에서 데이터를 조회 중입니다..."):
                     api_results = []
-                    
+
                     for cas in cas_list:
                         search_result = search_by_cas(cas)
                         if search_result.get('success'):
@@ -116,29 +247,51 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
                                 'error': search_result.get('error', '조회 실패')
                             })
                         time.sleep(0.3)
-                    
+
                     st.session_state['section15_api_results'] = api_results
+
+                    # ★ 핵심 수정: API 결과를 입력 필드에 자동 매핑
+                    apply_api_results_to_section15(api_results)
+
                     st.rerun()
-                    
+
             except ImportError:
                 st.error("❌ kosha_api_extended.py 모듈을 찾을 수 없습니다.")
             except Exception as e:
                 st.error(f"❌ API 조회 중 오류: {e}")
     else:
         st.warning("⚠️ 섹션 3에 CAS 번호가 등록된 구성성분이 없습니다.")
-    
+
     # API 결과 표시
     if 'section15_api_results' in st.session_state:
         st.markdown("---")
         st.markdown("**📊 조회 결과:**")
-        
+
         for result in st.session_state['section15_api_results']:
             if 'error' in result:
                 st.warning(f"⚠️ {result['cas']}: {result['error']}")
             else:
-                st.info(f"✅ **{result['name']}** (CAS: {result['cas']}) - 조회 완료")
-        
-        st.markdown("*위 정보를 참고하여 아래 양식을 작성하세요.*")
+                regs = result.get('regulations', {})
+                with st.expander(f"✅ **{result['name']}** (CAS: {result['cas']}) - 상세 보기"):
+                    raw = regs.get('raw_items', [])
+                    if raw:
+                        for item in raw:
+                            st.write(f"  • **{item['name']}**: {item['detail']}")
+                    else:
+                        st.write("  (raw_items 없음)")
+
+                    # 산업안전보건법 O/X 요약
+                    osha = regs.get('occupational_safety', {})
+                    st.write("**산업안전보건법 요약:**")
+                    for k, label in [('measurement', '작업환경측정'), ('health_check', '특수건강진단'),
+                                     ('managed_hazard', '관리대상유해물질'), ('exposure_limit', '노출기준설정')]:
+                        st.write(f"  {label}: {'⭕' if osha.get(k) == 'O' else '❌'}")
+
+        # 수동 재적용 버튼
+        if st.button("📥 조회 결과를 입력란에 다시 적용", key="reapply_btn"):
+            apply_api_results_to_section15(st.session_state['section15_api_results'])
+            st.success("✅ API 조회 결과가 아래 입력란에 반영되었습니다.")
+            st.rerun()
 
 st.markdown("---")
 
