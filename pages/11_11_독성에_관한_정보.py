@@ -189,11 +189,15 @@ def apply_api_results_to_section11(api_results):
     # 세션 상태 반영
     s11 = st.session_state.section11_data
     if all_exposure:
-        s11['가_가능성이_높은_노출_경로에_관한_정보'] = "\n".join(all_exposure)
+        new_val = "\n".join(all_exposure)
+        s11['가_가능성이_높은_노출_경로에_관한_정보'] = new_val
+        st.session_state["exposure_routes"] = new_val
 
     for fk, lines in all_health.items():
         if lines:
-            s11['나_건강_유해성_정보'][fk] = "\n\n".join(lines)
+            new_val = "\n\n".join(lines)
+            s11['나_건강_유해성_정보'][fk] = new_val
+            st.session_state[f"s11_{fk}"] = new_val
 
 
 # ============================================================
@@ -238,13 +242,6 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
 
                     st.session_state['section11_api_results'] = api_results
                     apply_api_results_to_section11(api_results)
-                    # ★ widget key 삭제 → rerun 시 value= 에서 새 값 로드
-                    if "exposure_routes" in st.session_state:
-                        del st.session_state["exposure_routes"]
-                    for k in list(st.session_state.section11_data.get('나_건강_유해성_정보', {}).keys()):
-                        wk = f"s11_{k}"
-                        if wk in st.session_state:
-                            del st.session_state[wk]
                     st.rerun()
 
             except ImportError:
@@ -269,12 +266,6 @@ with st.expander("🔗 KOSHA API 연동 (클릭하여 열기)", expanded=False):
 
         if st.button("📥 조회 결과를 입력란에 다시 적용", key="reapply_btn"):
             apply_api_results_to_section11(st.session_state['section11_api_results'])
-            if "exposure_routes" in st.session_state:
-                del st.session_state["exposure_routes"]
-            for k in list(st.session_state.section11_data.get('나_건강_유해성_정보', {}).keys()):
-                wk = f"s11_{k}"
-                if wk in st.session_state:
-                    del st.session_state[wk]
             st.success("✅ 반영 완료!")
             st.rerun()
 
