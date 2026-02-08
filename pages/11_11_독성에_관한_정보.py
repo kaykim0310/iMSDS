@@ -18,8 +18,6 @@ st.markdown("""
     .section-header { background-color: #d3e3f3; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
     .subsection-header { background-color: #e8f0f7; padding: 8px; border-radius: 3px; margin: 15px 0; font-weight: bold; }
     .field-header { background-color: #f5f5f5; padding: 10px; border-radius: 5px; border-left: 4px solid #1976d2; margin: 15px 0 5px 0; font-weight: bold; font-size: 1.05em; }
-    .kosha-tag { background-color: #4caf50; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-right: 5px; }
-    .pubchem-tag { background-color: #2196f3; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-right: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -40,21 +38,21 @@ if 'section11_data' not in st.session_state:
         }
     }
 
-# 독성 항목 정의: (키, 한글명, KOSHA 매칭 키워드, placeholder)
+# 독성 항목 정의: (키, 한글명, 매칭 키워드(한글+영문), placeholder)
 TOXICITY_FIELDS = [
-    ('급성독성_경구', '급성독성 (경구)', ['경구'], "예: LD50 = 5800 mg/kg (Rat)"),
-    ('급성독성_경피', '급성독성 (경피)', ['경피'], "예: LD50 > 2000 mg/kg (Rabbit)"),
-    ('급성독성_흡입', '급성독성 (흡입)', ['흡입'], "예: LC50 = 76 mg/L (Rat, 4hr)"),
-    ('피부_부식성_또는_자극성', '피부 부식성/자극성', ['피부부식', '피부 부식', '피부자극', '피부 자극'], "예: 구분 2"),
-    ('심한_눈_손상_또는_자극성', '심한 눈 손상/자극성', ['눈손상', '눈 손상', '눈자극', '눈 자극'], "예: 구분 2A"),
-    ('호흡기_과민성', '호흡기 과민성', ['호흡기과민', '호흡기 과민'], "예: 자료없음"),
-    ('피부_과민성', '피부 과민성', ['피부과민', '피부 과민'], "예: 자료없음"),
-    ('발암성', '발암성', ['발암'], "예: IARC Group 3"),
-    ('생식세포_변이원성', '생식세포 변이원성', ['변이원', '돌연변이'], "예: Ames test 음성"),
-    ('생식독성', '생식독성', ['생식독성', '생식'], "예: 자료없음"),
-    ('특정_표적장기_독성_1회노출', '특정 표적장기 독성 (1회 노출)', ['1회', '단회'], "예: 구분 3 (마취작용)"),
-    ('특정_표적장기_독성_반복노출', '특정 표적장기 독성 (반복 노출)', ['반복'], "예: 자료없음"),
-    ('흡인_유해성', '흡인 유해성', ['흡인'], "예: 자료없음"),
+    ('급성독성_경구', '급성독성 (경구)', ['경구', 'oral', 'Acute Oral', 'ingestion'], "예: LD50 = 5800 mg/kg (Rat)"),
+    ('급성독성_경피', '급성독성 (경피)', ['경피', 'dermal', 'Acute Dermal', 'skin absorption'], "예: LD50 > 2000 mg/kg (Rabbit)"),
+    ('급성독성_흡입', '급성독성 (흡입)', ['흡입', 'inhalation', 'Acute Inhalation'], "예: LC50 = 76 mg/L (Rat, 4hr)"),
+    ('피부_부식성_또는_자극성', '피부 부식성/자극성', ['피부부식', '피부 부식', '피부자극', '피부 자극', 'Skin Corrosion', 'Skin Irritation', 'skin irrit'], "예: 구분 2"),
+    ('심한_눈_손상_또는_자극성', '심한 눈 손상/자극성', ['눈손상', '눈 손상', '눈자극', '눈 자극', 'Eye Damage', 'Eye Irritation', 'Serious Eye', 'eye irrit'], "예: 구분 2A"),
+    ('호흡기_과민성', '호흡기 과민성', ['호흡기과민', '호흡기 과민', 'Respiratory Sensitiz', 'respiratory sensit'], "예: 자료없음"),
+    ('피부_과민성', '피부 과민성', ['피부과민', '피부 과민', 'Skin Sensitiz', 'skin sensit'], "예: 자료없음"),
+    ('발암성', '발암성', ['발암', 'Carcinogen', 'IARC', 'NTP', 'carcino'], "예: IARC Group 3"),
+    ('생식세포_변이원성', '생식세포 변이원성', ['변이원', '돌연변이', 'Genotoxic', 'Mutagen', 'mutageni', 'genotox', 'Ames'], "예: Ames test 음성"),
+    ('생식독성', '생식독성', ['생식독성', '생식', 'Reproductive Toxic', 'Developmental Toxic', 'reproduct', 'teratogen'], "예: 자료없음"),
+    ('특정_표적장기_독성_1회노출', '특정 표적장기 독성 (1회 노출)', ['1회', '단회', 'single exposure', 'Target Organ.*single'], "예: 구분 3 (마취작용)"),
+    ('특정_표적장기_독성_반복노출', '특정 표적장기 독성 (반복 노출)', ['반복', 'Chronic Toxic', 'Repeated Dose', 'chronic', 'repeated', 'subchronic'], "예: 자료없음"),
+    ('흡인_유해성', '흡인 유해성', ['흡인', 'Aspiration', 'aspiration'], "예: 자료없음"),
 ]
 
 
@@ -120,19 +118,28 @@ def query_pubchem(cas_no):
         return {"success": False, "error": str(e), "raw_items": []}
 
 
-def classify_item(item_name):
-    """항목명을 독성 필드 키로 매핑"""
-    n = item_name.strip().lower()
-    # LD50/LC50 키워드 우선
-    if "ld50" in n:
-        if "oral" in n or "경구" in n: return "급성독성_경구"
-        if "dermal" in n or "경피" in n: return "급성독성_경피"
-        if "inhal" in n or "흡입" in n: return "급성독성_흡입"
-    if "lc50" in n: return "급성독성_흡입"
-    
+def classify_item(item_name, detail=""):
+    """항목명+내용을 독성 필드 키로 매핑 (한글+영문 모두 지원)"""
+    combined = (item_name + " " + detail).strip()
+    combined_lower = combined.lower()
+
+    # LD50/LC50 키워드 우선 (detail에도 있을 수 있으므로 combined 사용)
+    if "ld50" in combined_lower:
+        if "oral" in combined_lower or "경구" in combined_lower:
+            return "급성독성_경구"
+        if "dermal" in combined_lower or "경피" in combined_lower:
+            return "급성독성_경피"
+        if "inhal" in combined_lower or "흡입" in combined_lower:
+            return "급성독성_흡입"
+        return "급성독성_경구"  # LD50 기본값: 경구
+    if "lc50" in combined_lower:
+        return "급성독성_흡입"
+
+    # 각 필드 키워드 매칭 (대소문자 무시)
     for key, label, keywords, _ in TOXICITY_FIELDS:
         for kw in keywords:
-            if kw in item_name: return key
+            if kw.lower() in combined_lower:
+                return key
     return None
 
 
@@ -158,7 +165,10 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
             st.write(f"  • **{m['name']}** (CAS: {m['cas']})")
 
         if st.button("🔍 KOSHA + 국제DB 동시 조회", type="primary", key="dual_query_s11"):
-            all_results = []  # [{mat, cas, source, field_key, detail, idx}, ...]
+            all_results = []
+            # 물질별로 어떤 필드에 데이터가 있었는지 추적
+            mat_field_found = {m['name']: set() for m in mat_info}
+
             prog = st.progress(0)
             total = len(cas_list) * 2
             step = 0
@@ -169,13 +179,14 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
                 kr = query_kosha(m['cas'])
                 if kr.get('success'):
                     for item in kr['raw_items']:
-                        fk = classify_item(item['name'])
+                        fk = classify_item(item['name'], item.get('detail', ''))
                         if fk:
                             all_results.append({
                                 'mat': m['name'], 'cas': m['cas'],
                                 'src': 'KOSHA', 'field': fk,
                                 'label': item['name'], 'detail': item['detail']
                             })
+                            mat_field_found[m['name']].add(fk)
                 step += 1
                 time.sleep(0.3)
 
@@ -183,20 +194,33 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
                 prog.progress(step / total, f"🔵 국제DB: {m['name']}...")
                 pr = query_pubchem(m['cas'])
                 if pr.get('success'):
+                    # 발암성은 KOSHA 데이터만 사용 (PubChem 제외)
+                    KOSHA_ONLY_FIELDS = {'발암성'}
                     for item in pr['raw_items']:
-                        fk = classify_item(item['name'])
-                        if fk:
+                        fk = classify_item(item['name'], item.get('detail', ''))
+                        if fk and fk not in KOSHA_ONLY_FIELDS:
                             all_results.append({
                                 'mat': m['name'], 'cas': m['cas'],
                                 'src': 'PubChem', 'field': fk,
                                 'label': item['name'], 'detail': item['detail']
                             })
+                            mat_field_found[m['name']].add(fk)
                 step += 1
                 time.sleep(0.3)
 
+            # ── 수정3: 데이터가 없는 물질+항목에 "자료없음" 추가 ──
+            for m in mat_info:
+                for fk, fl, _, _ in TOXICITY_FIELDS:
+                    if fk not in mat_field_found[m['name']]:
+                        all_results.append({
+                            'mat': m['name'], 'cas': m['cas'],
+                            'src': '-', 'field': fk,
+                            'label': fl, 'detail': '자료없음',
+                            'no_data': True
+                        })
+
             prog.progress(1.0, "✅ 조회 완료!")
 
-            # 인덱스 부여
             for i, r in enumerate(all_results):
                 r['idx'] = i
 
@@ -213,7 +237,6 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
         st.markdown("### 📊 항목별 데이터 선택")
         st.info("☑ 원하는 독성값을 체크한 후 아래 **[선택 반영]** 버튼을 누르세요.")
 
-        # 항목별로 그룹핑
         for fk, fl, _, _ in TOXICITY_FIELDS:
             items_in_field = [r for r in all_results if r['field'] == fk]
             if not items_in_field:
@@ -223,39 +246,39 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
 
             for r in items_in_field:
                 idx = r['idx']
-                src_emoji = "🟢" if r['src'] == 'KOSHA' else "🔵"
-                src_label = r['src']
+                is_no_data = r.get('no_data', False)
                 mat_name = r['mat']
                 detail = r['detail']
 
-                # 표시 텍스트: [출처] 물질명 - 상세값
-                display_text = f"{src_emoji} **[{src_label}]** {mat_name}: {detail[:150]}"
+                if is_no_data:
+                    # 자료없음 항목: 회색으로 표시
+                    display_text = f"⬜ {mat_name}: 자료없음"
+                else:
+                    src_emoji = "🟢" if r['src'] == 'KOSHA' else "🔵"
+                    src_label = r['src']
+                    display_text = f"{src_emoji} **{src_label}** | {mat_name}: {detail[:200]}"
 
                 col_chk, col_txt = st.columns([0.05, 0.95])
                 with col_chk:
-                    checked = st.checkbox(
-                        "선택", key=f"chk11_{idx}",
-                        label_visibility="collapsed"
-                    )
+                    st.checkbox("선택", key=f"chk11_{idx}", label_visibility="collapsed")
                 with col_txt:
                     st.markdown(display_text)
 
-            st.markdown("")  # 여백
+            st.markdown("")
 
         # ===== 선택 반영 버튼 =====
         st.markdown("---")
         if st.button("✅ 선택한 데이터를 입력란에 반영", type="primary", key="apply_s11"):
-            # 체크된 항목 수집 → 필드별로 묶어서 반영
             selected_by_field = {fk: [] for fk, _, _, _ in TOXICITY_FIELDS}
 
             for r in all_results:
                 idx = r['idx']
                 if st.session_state.get(f"chk11_{idx}", False):
                     fk = r['field']
-                    src = r['src']
                     mat = r['mat']
                     detail = r['detail']
-                    selected_by_field[fk].append(f"[{src}] {mat}: {detail}")
+                    # ── 수정1: [PubChem], [KOSHA] 태그 없이 물질명: 값 형태로 반영 ──
+                    selected_by_field[fk].append(f"{mat}: {detail}")
 
             applied_count = 0
             for fk, _, _, _ in TOXICITY_FIELDS:
@@ -289,13 +312,7 @@ st.markdown('<div class="subsection-header">나. 건강 유해성 정보</div>',
 
 for key, label, _, ph in TOXICITY_FIELDS:
     cur = st.session_state.section11_data['나_건강_유해성_정보'].get(key, '')
-    tag = ""
-    if cur:
-        if "[KOSHA]" in cur and "[PubChem]" in cur: tag = " 🟢🔵"
-        elif "[KOSHA]" in cur: tag = " 🟢"
-        elif "[PubChem]" in cur: tag = " 🔵"
-        elif cur.strip() not in ("", "자료없음"): tag = " ✏️"
-    st.markdown(f"**{label}{tag}**")
+    st.markdown(f"**{label}**")
     val = st.text_area(label, value=cur, height=80, placeholder=ph, key=f"s11_{key}", label_visibility="collapsed")
     st.session_state.section11_data['나_건강_유해성_정보'][key] = val
 
