@@ -46,80 +46,204 @@ ATE_CONVERSION = {
     '경피': {'구분 1': 5, '구분 2': 50, '구분 3': 300, '구분 4': 1100, '구분 5': 2500},
 }
 
-# 함유량 기준 분류 (항목별)
-CONC_CRITERIA = {
+# 항목별 드롭다운 구분 옵션 + 혼합물 판정 로직
+FIELD_CONFIG = {
     '피부_부식성_또는_자극성': {
         'desc': '피부 부식성/자극성',
-        'rules': [
-            {'label': '구분 1 (부식성)', 'condition': '구분1 성분 합계 ≥ 5%', 'field': '구분1', 'threshold': 5.0},
-            {'label': '구분 2 (자극성)', 'condition': '구분1: 1~5% 또는 구분2 ≥10% 또는 (구분1×10)+구분2 ≥10%', 'field': '구분2', 'threshold': 10.0},
-        ]
+        'options': ["해당없음", "구분 1 (부식성)", "구분 2 (자극성)", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1 (부식성): 구분1 성분 합계 ≥ 5%',
+            '구분 2 (자극성): 구분1 1~5% 또는 구분2 ≥ 10% 또는 (구분1×10)+구분2 ≥ 10%',
+        ],
     },
     '심한_눈_손상_또는_자극성': {
         'desc': '심한 눈 손상/자극성',
-        'rules': [
-            {'label': '구분 1 (심한 눈 손상)', 'condition': '(눈 구분1 + 피부 구분1) 합계 ≥ 3%', 'threshold': 3.0},
-            {'label': '구분 2 (자극성)', 'condition': '(눈 구분1 + 피부 구분1): 1~3% 또는 눈 구분2 ≥10%', 'threshold': 10.0},
-        ]
+        'options': ["해당없음", "구분 1 (심한 눈 손상)", "구분 2A (자극성)", "구분 2B (경미)", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1: (눈 구분1 + 피부 구분1) 합계 ≥ 3%',
+            '구분 2: (눈 구분1 + 피부 구분1) 1~3% 또는 눈 구분2 ≥ 10%',
+        ],
     },
     '호흡기_과민성': {
         'desc': '호흡기 과민성',
-        'rules': [
-            {'label': '구분 1A', 'condition': '호흡기 과민성 성분 ≥ 0.1%', 'threshold': 0.1},
-            {'label': '구분 1B', 'condition': '고체/액체 ≥ 1.0%, 가스 ≥ 0.2%', 'threshold': 1.0},
-        ]
+        'options': ["해당없음", "구분 1", "구분 1A", "구분 1B", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1A: 호흡기 과민성 구분1 성분 ≥ 0.1%',
+            '구분 1B: 고체/액체 ≥ 1.0%, 가스 ≥ 0.2%',
+        ],
     },
     '피부_과민성': {
         'desc': '피부 과민성',
-        'rules': [
-            {'label': '구분 1A', 'condition': '피부 과민성 성분 ≥ 0.1%', 'threshold': 0.1},
-            {'label': '구분 1B', 'condition': '피부 과민성 성분 ≥ 1.0%', 'threshold': 1.0},
-        ]
+        'options': ["해당없음", "구분 1", "구분 1A", "구분 1B", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1A: 피부 과민성 구분1 성분 ≥ 0.1%',
+            '구분 1B: 피부 과민성 구분1 성분 ≥ 1.0%',
+        ],
     },
     '발암성': {
         'desc': '발암성',
-        'rules': [
-            {'label': '구분 1A/1B', 'condition': '발암성 구분1 성분 ≥ 0.1%', 'threshold': 0.1},
-            {'label': '구분 2', 'condition': '발암성 구분2 성분 ≥ 1.0%', 'threshold': 1.0},
-        ]
+        'options': ["해당없음", "구분 1A", "구분 1B", "구분 2", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1A/1B: 발암성 구분1A/1B 성분 ≥ 0.1%',
+            '구분 2: 발암성 구분2 성분 ≥ 1.0%',
+        ],
     },
     '생식세포_변이원성': {
         'desc': '생식세포 변이원성',
-        'rules': [
-            {'label': '구분 1A/1B', 'condition': '변이원성 구분1 성분 ≥ 0.1%', 'threshold': 0.1},
-            {'label': '구분 2', 'condition': '변이원성 구분2 성분 ≥ 1.0%', 'threshold': 1.0},
-        ]
+        'options': ["해당없음", "구분 1A", "구분 1B", "구분 2", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1A/1B: 변이원성 구분1A/1B 성분 ≥ 0.1%',
+            '구분 2: 변이원성 구분2 성분 ≥ 1.0%',
+        ],
     },
     '생식독성': {
         'desc': '생식독성',
-        'rules': [
-            {'label': '구분 1A/1B', 'condition': '생식독성 구분1 성분 ≥ 0.3%', 'threshold': 0.3},
-            {'label': '구분 2', 'condition': '생식독성 구분2 성분 ≥ 3.0%', 'threshold': 3.0},
-            {'label': '수유독성', 'condition': '수유독성 성분 ≥ 0.3%', 'threshold': 0.3},
-        ]
+        'options': ["해당없음", "구분 1A", "구분 1B", "구분 2", "수유독성", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1A/1B: 생식독성 구분1A/1B 성분 ≥ 0.3%',
+            '구분 2: 생식독성 구분2 성분 ≥ 3.0%',
+            '수유독성: 수유독성 성분 ≥ 0.3%',
+        ],
     },
     '특정_표적장기_독성_1회노출': {
         'desc': '특정 표적장기 독성 (1회 노출)',
-        'rules': [
-            {'label': '구분 1', 'condition': 'STOT-1회 구분1 성분 ≥ 10%', 'threshold': 10.0},
-            {'label': '구분 2', 'condition': 'STOT-1회 구분1: 1~10% 또는 구분2 ≥ 10%', 'threshold': 10.0},
-            {'label': '구분 3 (호흡기자극/마취)', 'condition': '구분3 성분 ≥ 20%', 'threshold': 20.0},
-        ]
+        'options': ["해당없음", "구분 1", "구분 2", "구분 3 (호흡기자극/마취)", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1: STOT-1회 구분1 성분 ≥ 10%',
+            '구분 2: 구분1 1~10% 또는 구분2 ≥ 10%',
+            '구분 3: 구분3 성분 ≥ 20%',
+        ],
     },
     '특정_표적장기_독성_반복노출': {
         'desc': '특정 표적장기 독성 (반복 노출)',
-        'rules': [
-            {'label': '구분 1', 'condition': 'STOT-반복 구분1 성분 ≥ 10%', 'threshold': 10.0},
-            {'label': '구분 2', 'condition': 'STOT-반복 구분1: 1~10% 또는 구분2 ≥ 10%', 'threshold': 10.0},
-        ]
+        'options': ["해당없음", "구분 1", "구분 2", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1: STOT-반복 구분1 성분 ≥ 10%',
+            '구분 2: 구분1 1~10% 또는 구분2 ≥ 10%',
+        ],
     },
     '흡인_유해성': {
         'desc': '흡인 유해성',
-        'rules': [
-            {'label': '구분 1', 'condition': '흡인 구분1 성분 ≥ 10% + 동점도 ≤ 20.5 mm²/s', 'threshold': 10.0},
-        ]
+        'options': ["해당없음", "구분 1", "구분 2", "분류되지 않음", "자료없음"],
+        'rules_text': [
+            '구분 1: 구분1 성분 ≥ 10% + 동점도 ≤ 20.5 mm²/s (40℃)',
+            '구분 2: 구분2 성분 ≥ 10% + 동점도 ≤ 14 mm²/s (40℃)',
+        ],
     },
 }
+
+
+def _is_cls1(cls_str):
+    """구분 1 계열인지 판정"""
+    return cls_str in ['구분 1', '구분 1A', '구분 1B', '구분 1C',
+                       '구분 1 (부식성)', '구분 1 (심한 눈 손상)']
+
+
+def _is_cls2(cls_str):
+    return cls_str in ['구분 2', '구분 2 (자극성)', '구분 2A (자극성)', '구분 2A', '구분 2B', '구분 2B (경미)']
+
+
+def _is_cls3(cls_str):
+    return '구분 3' in cls_str
+
+
+def judge_classification(key, comp_data):
+    """항목별 정확한 혼합물 분류 판정 (고용노동부 고시 별표 1)"""
+    cls1_sum = sum(d['pct'] for d in comp_data if _is_cls1(d['cls']))
+    cls2_sum = sum(d['pct'] for d in comp_data if _is_cls2(d['cls']))
+    cls3_sum = sum(d['pct'] for d in comp_data if _is_cls3(d['cls']))
+    cls1a_sum = sum(d['pct'] for d in comp_data if d['cls'] == '구분 1A')
+    cls1b_sum = sum(d['pct'] for d in comp_data if d['cls'] == '구분 1B')
+    nursing_sum = sum(d['pct'] for d in comp_data if d['cls'] == '수유독성')
+    unknown = sum(d['pct'] for d in comp_data if d['cls'] == '자료없음')
+
+    result = "분류되지 않음"
+    details = []
+
+    if key == '피부_부식성_또는_자극성':
+        if cls1_sum >= 5:
+            result = "구분 1 (부식성)"; details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ 5%")
+        elif cls1_sum >= 1 and cls1_sum < 5:
+            result = "구분 2 (자극성)"; details.append(f"구분1 합계 {cls1_sum:.2f}% (1~5%)")
+        elif cls2_sum >= 10:
+            result = "구분 2 (자극성)"; details.append(f"구분2 합계 {cls2_sum:.2f}% ≥ 10%")
+        else:
+            combined = cls1_sum * 10 + cls2_sum
+            if combined >= 10:
+                result = "구분 2 (자극성)"; details.append(f"(구분1×10)+구분2 = {combined:.2f}% ≥ 10%")
+
+    elif key == '심한_눈_손상_또는_자극성':
+        if cls1_sum >= 3:
+            result = "구분 1 (심한 눈 손상)"; details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ 3%")
+        elif cls1_sum >= 1 and cls1_sum < 3:
+            result = "구분 2A (자극성)"; details.append(f"구분1 합계 {cls1_sum:.2f}% (1~3%)")
+        elif cls2_sum >= 10:
+            result = "구분 2A (자극성)"; details.append(f"구분2 합계 {cls2_sum:.2f}% ≥ 10%")
+        else:
+            combined = cls1_sum * 10 + cls2_sum
+            if combined >= 10:
+                result = "구분 2A (자극성)"; details.append(f"(구분1×10)+구분2 = {combined:.2f}% ≥ 10%")
+
+    elif key == '호흡기_과민성':
+        if cls1a_sum >= 0.1 or (cls1_sum >= 0.1):
+            result = "구분 1"; details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ 0.1%")
+        elif cls1b_sum >= 1.0:
+            result = "구분 1"; details.append(f"구분1B 합계 {cls1b_sum:.2f}% ≥ 1.0%")
+
+    elif key == '피부_과민성':
+        if cls1a_sum >= 0.1 or (cls1_sum >= 0.1):
+            result = "구분 1"; details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ 0.1%")
+        elif cls1b_sum >= 1.0:
+            result = "구분 1"; details.append(f"구분1B 합계 {cls1b_sum:.2f}% ≥ 1.0%")
+
+    elif key in ('발암성', '생식세포_변이원성'):
+        if cls1_sum >= 0.1:
+            result = "구분 1A/1B"; details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ 0.1%")
+        elif cls2_sum >= 1.0:
+            result = "구분 2"; details.append(f"구분2 합계 {cls2_sum:.2f}% ≥ 1.0%")
+
+    elif key == '생식독성':
+        if cls1_sum >= 0.3:
+            result = "구분 1A/1B"; details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ 0.3%")
+        elif cls2_sum >= 3.0:
+            result = "구분 2"; details.append(f"구분2 합계 {cls2_sum:.2f}% ≥ 3.0%")
+        if nursing_sum >= 0.3:
+            if result != "분류되지 않음":
+                result += " + 수유독성"
+            else:
+                result = "수유독성"
+            details.append(f"수유독성 합계 {nursing_sum:.2f}% ≥ 0.3%")
+
+    elif key == '특정_표적장기_독성_1회노출':
+        if cls1_sum >= 10:
+            result = "구분 1"; details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ 10%")
+        elif cls1_sum >= 1 or cls2_sum >= 10:
+            result = "구분 2"
+            if cls1_sum >= 1: details.append(f"구분1 합계 {cls1_sum:.2f}% (1~10%)")
+            if cls2_sum >= 10: details.append(f"구분2 합계 {cls2_sum:.2f}% ≥ 10%")
+        elif cls3_sum >= 20:
+            result = "구분 3 (호흡기자극/마취)"; details.append(f"구분3 합계 {cls3_sum:.2f}% ≥ 20%")
+
+    elif key == '특정_표적장기_독성_반복노출':
+        if cls1_sum >= 10:
+            result = "구분 1"; details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ 10%")
+        elif cls1_sum >= 1 or cls2_sum >= 10:
+            result = "구분 2"
+            if cls1_sum >= 1: details.append(f"구분1 합계 {cls1_sum:.2f}% (1~10%)")
+            if cls2_sum >= 10: details.append(f"구분2 합계 {cls2_sum:.2f}% ≥ 10%")
+
+    elif key == '흡인_유해성':
+        if cls1_sum >= 10:
+            result = "구분 1"; details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ 10% (동점도 ≤ 20.5 mm²/s 확인 필요)")
+        elif cls2_sum >= 10:
+            result = "구분 2"; details.append(f"구분2 합계 {cls2_sum:.2f}% ≥ 10% (동점도 ≤ 14 mm²/s 확인 필요)")
+
+    if not details:
+        details.append("모든 기준 미달 → 분류되지 않음")
+
+    return result, details, {
+        'cls1': cls1_sum, 'cls2': cls2_sum, 'cls3': cls3_sum, 'unknown': unknown
+    }
 
 # ============================================================
 # 세션 초기화
@@ -203,6 +327,106 @@ def classify_ate(ate_value, route='경구'):
         if ate_value <= threshold:
             return label
     return '분류되지 않음'
+
+
+def conservative_score(detail, field_key=''):
+    """보수적(독성↑) 순으로 점수 부여. 점수가 높을수록 보수적.
+    - 수치형(LD50/LC50/EC50): 값이 낮을수록 보수적 → 역수 사용
+    - 구분형(발암성 등): 구분1A > 구분1B > 구분1 > 구분2 순
+    - 비수치 독성 표현: 키워드 기반 가중치
+    """
+    if not detail or detail.strip() in ('자료없음', '해당없음', '(없음)', ''):
+        return -9999  # 자료없음은 최하위
+
+    dl = detail.lower()
+
+    # 1) 수치 추출 가능한 항목 (급성독성 LD50/LC50/EC50 등)
+    num = extract_numeric(detail)
+    if num and num > 0:
+        # 숫자가 낮을수록 독성↑ → 역수를 점수로 (10000/값)
+        return 10000.0 / num
+
+    # 2) 구분(Category) 기반 판정
+    cat_scores = {
+        '구분 1a': 100, '구분1a': 100, 'category 1a': 100, 'cat 1a': 100,
+        '구분 1b': 95, '구분1b': 95, 'category 1b': 95, 'cat 1b': 95,
+        '구분 1c': 90, '구분1c': 90, 'category 1c': 90,
+        '구분 1': 85, '구분1': 85, 'category 1': 85, 'cat 1': 85,
+        '구분 2a': 75, '구분2a': 75, 'category 2a': 75,
+        '구분 2b': 72, '구분2b': 72, 'category 2b': 72,
+        '구분 2': 70, '구분2': 70, 'category 2': 70, 'cat 2': 70,
+        '구분 3': 60, '구분3': 60, 'category 3': 60,
+        '구분 4': 50, '구분4': 50, 'category 4': 50,
+        '구분 5': 40, '구분5': 40, 'category 5': 40,
+    }
+    best_cat = -1
+    for pat, sc in cat_scores.items():
+        if pat in dl:
+            best_cat = max(best_cat, sc)
+    if best_cat > 0:
+        return best_cat
+
+    # 3) IARC/NTP 발암성 등급
+    iarc_scores = {
+        'group 1': 100, 'iarc 1': 100, '1군': 100,
+        'group 2a': 90, 'iarc 2a': 90, '2a군': 90,
+        'group 2b': 80, 'iarc 2b': 80, '2b군': 80,
+        'group 3': 50, 'iarc 3': 50,
+    }
+    for pat, sc in iarc_scores.items():
+        if pat in dl:
+            return sc
+
+    # 4) 독성 표현 키워드 (비수치)
+    severe_kw = {
+        'corrosive': 80, '부식': 80, 'irreversible': 80, '비가역': 80,
+        'fatal': 90, '치명': 90, 'lethal': 90,
+        'toxic': 70, '독성': 70, 'harmful': 60, '유해': 60,
+        'irritat': 50, '자극': 50,
+        'sensitiz': 60, '과민': 60,
+        'not classified': 10, '분류되지': 10, '해당없음': 5,
+        'positive': 65, '양성': 65,
+        'negative': 15, '음성': 15,
+    }
+    best_kw = 0
+    for kw, sc in severe_kw.items():
+        if kw in dl:
+            best_kw = max(best_kw, sc)
+    if best_kw > 0:
+        return best_kw
+
+    # 5) 기본: 내용이 있으면 약간의 점수
+    return 1
+
+
+def auto_select_conservative(all_results, prefix="chk11"):
+    """물질별·항목별로 가장 보수적인(독성↑) 결과 1개씩 자동 선택.
+    이미 사용자가 체크한 것이 있으면 건드리지 않음.
+    """
+    from collections import defaultdict
+
+    # 사용자가 이미 수동 체크한 게 있는지 확인
+    any_manual = any(
+        st.session_state.get(f"{prefix}_{r['idx']}", False)
+        for r in all_results if not r.get('no_data')
+    )
+    if any_manual:
+        return  # 사용자가 이미 선택함 → 자동선택 안 함
+
+    # (물질, 항목) 그룹별로 최고 보수점수 결과 찾기
+    groups = defaultdict(list)
+    for r in all_results:
+        if r.get('no_data'):
+            continue
+        groups[(r['mat'], r['field'])].append(r)
+
+    for (mat, fk), items in groups.items():
+        if not items:
+            continue
+        scored = [(conservative_score(r['detail'], fk), r) for r in items]
+        scored.sort(key=lambda x: x[0], reverse=True)
+        best_r = scored[0][1]
+        st.session_state[f"{prefix}_{best_r['idx']}"] = True
 
 
 # ============================================================
@@ -343,9 +567,13 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
     # 결과 체크박스
     if 's11_all' in st.session_state and st.session_state['s11_all']:
         all_results = st.session_state['s11_all']
+
+        # ── 자동 보수적 선택 (최초 1회) ──
+        auto_select_conservative(all_results, prefix="chk11")
+
         st.markdown("---")
         st.markdown("### 📊 항목별 데이터 선택")
-        st.info("☑ 원하는 독성값을 체크 → **[선택 반영]** → 아래 ATEmix 계산 및 분류 판정으로 진행")
+        st.info("⚡ **가장 보수적인 값**(독성↑)이 자동 선택되었습니다. 필요 시 수정하세요.")
 
         for fk, fl, _, _ in TOXICITY_FIELDS:
             items_in_field = [r for r in all_results if r['field'] == fk]
@@ -357,7 +585,9 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
                     display = f"⬜ {r['mat']}: 자료없음"
                 else:
                     emoji = "🟢" if r['src'] == 'KOSHA' else "🔵"
-                    display = f"{emoji} **{r['src']}** | {r['mat']}: {r['detail'][:180]}"
+                    score = conservative_score(r['detail'], fk)
+                    score_tag = f" `[보수적 점수: {score:.1f}]`" if score > 0 else ""
+                    display = f"{emoji} **{r['src']}** | {r['mat']}: {r['detail'][:160]}{score_tag}"
                 c1, c2 = st.columns([0.05, 0.95])
                 with c1: st.checkbox("선택", key=f"chk11_{idx}", label_visibility="collapsed")
                 with c2: st.markdown(display)
@@ -510,13 +740,16 @@ for route_key, route_label, route_kws, route_ph in TOXICITY_FIELDS[:3]:
 
                         st.session_state[f'ate_result_{route_key}'] = f"ATEmix = {ate_mix:.2f} → {classification}"
 
-            # ATEmix 결과가 있으면 확정 버튼
+            # ATEmix 결과가 있으면 수정 + 확정
             if f'ate_result_{route_key}' in st.session_state:
-                result_text = st.session_state[f'ate_result_{route_key}']
-                st.markdown(f"**산정 결과:** {result_text}")
+                st.markdown("---")
+                st.markdown("**최종 판정 결과** (수정 가능):")
+                edited_ate = st.text_input(
+                    "판정 결과", value=st.session_state[f'ate_result_{route_key}'],
+                    key=f"edit_ate_{route_key}", label_visibility="collapsed")
                 if st.button(f"✅ 이 결과를 확정합니다", key=f"confirm_ate_{route_key}"):
-                    st.session_state.confirmed_classifications[route_key] = result_text
-                    st.success(f"✅ {route_label}: {result_text} 확정!")
+                    st.session_state.confirmed_classifications[route_key] = edited_ate
+                    st.success(f"✅ {route_label}: {edited_ate} 확정!")
                     st.rerun()
 
 
@@ -532,20 +765,20 @@ for key, label, kws, ph in TOXICITY_FIELDS[3:]:
     if is_confirmed:
         st.markdown(f'<div class="result-box">✅ <b>확정 분류:</b> {is_confirmed} <span class="confirm-badge">CONFIRMED</span></div>', unsafe_allow_html=True)
 
-    if key in CONC_CRITERIA and components:
-        criteria = CONC_CRITERIA[key]
+    if key in FIELD_CONFIG and components:
+        cfg = FIELD_CONFIG[key]
 
         with st.expander(f"📐 함유량 기준 분류 판정 ({label})", expanded=False):
             st.markdown(f"""
             <div class="calc-box">
-            <b>{criteria['desc']}</b> - 혼합물 분류 (함유량 기준)<br>
+            <b>{cfg['desc']}</b> - 혼합물 분류 (함유량 기준)<br>
             <small>각 성분의 해당 구분 함유량 합계로 혼합물 구분 판정</small>
             </div>
             """, unsafe_allow_html=True)
 
             st.markdown("**분류 기준:**")
-            for rule in criteria['rules']:
-                st.write(f"  • **{rule['label']}**: {rule['condition']}")
+            for rt in cfg['rules_text']:
+                st.write(f"  • {rt}")
 
             st.markdown("---")
             st.markdown("**성분별 해당 구분 정보 입력:**")
@@ -561,10 +794,7 @@ for key, label, kws, ph in TOXICITY_FIELDS[3:]:
                         min_value=0.0, max_value=100.0, step=0.1,
                         key=f"conc_pct_{key}_{i}", label_visibility="collapsed")
                 with c3:
-                    # 이 성분이 해당 항목에서 어떤 구분인지
-                    class_options = ["해당없음", "구분 1A", "구분 1B", "구분 1C", "구분 1",
-                                     "구분 2", "구분 3", "자료없음"]
-                    cls = st.selectbox(f"{comp['name']} 구분", class_options,
+                    cls = st.selectbox(f"{comp['name']} 구분", cfg['options'],
                         key=f"conc_cls_{key}_{i}", label_visibility="collapsed")
 
                 comp_class_data.append({'name': comp['name'], 'pct': pct, 'cls': cls})
@@ -572,52 +802,13 @@ for key, label, kws, ph in TOXICITY_FIELDS[3:]:
             # 자동 판정
             st.markdown("---")
             if st.button(f"📊 분류 판정", key=f"calc_conc_{key}"):
-                # 구분별 함유량 합산
-                cls1_sum = sum(d['pct'] for d in comp_class_data
-                    if d['cls'] in ['구분 1', '구분 1A', '구분 1B', '구분 1C'])
-                cls2_sum = sum(d['pct'] for d in comp_class_data if d['cls'] == '구분 2')
-                cls3_sum = sum(d['pct'] for d in comp_class_data if d['cls'] == '구분 3')
-                unknown = sum(d['pct'] for d in comp_class_data if d['cls'] == '자료없음')
+                recommendation, details, sums = judge_classification(key, comp_class_data)
 
                 st.markdown("**함유량 합산:**")
-                st.code(f"  구분1 합계: {cls1_sum:.2f}%\n  구분2 합계: {cls2_sum:.2f}%"
-                    + (f"\n  구분3 합계: {cls3_sum:.2f}%" if cls3_sum > 0 else "")
-                    + (f"\n  ⚠ 자료없음: {unknown:.2f}%" if unknown > 0 else ""))
-
-                # 판정 로직
-                recommendation = "분류되지 않음"
-                details = []
-
-                for rule in criteria['rules']:
-                    threshold = rule['threshold']
-                    rule_label = rule['label']
-                    field_type = rule.get('field', '')
-
-                    if '구분1' in rule_label or '1A' in rule_label or '1B' in rule_label:
-                        if cls1_sum >= threshold:
-                            recommendation = rule_label
-                            details.append(f"구분1 합계 {cls1_sum:.2f}% ≥ {threshold}% → {rule_label}")
-                            break
-                    elif '구분 2' in rule_label:
-                        if cls2_sum >= threshold:
-                            recommendation = rule_label
-                            details.append(f"구분2 합계 {cls2_sum:.2f}% ≥ {threshold}% → {rule_label}")
-                            break
-                        # 가산 방식: (구분1×10)+구분2 ≥ 10
-                        if '가산' in rule.get('condition', '') or '×10' in rule.get('condition', ''):
-                            combined = cls1_sum * 10 + cls2_sum
-                            if combined >= threshold:
-                                recommendation = rule_label
-                                details.append(f"(구분1×10)+구분2 = {combined:.2f}% ≥ {threshold}% → {rule_label}")
-                                break
-                    elif '구분 3' in rule_label:
-                        if cls3_sum >= threshold:
-                            recommendation = rule_label
-                            details.append(f"구분3 합계 {cls3_sum:.2f}% ≥ {threshold}% → {rule_label}")
-                            break
-
-                if not details:
-                    details.append("모든 기준 미달 → 분류되지 않음")
+                code = f"  구분1 합계: {sums['cls1']:.2f}%\n  구분2 합계: {sums['cls2']:.2f}%"
+                if sums['cls3'] > 0: code += f"\n  구분3 합계: {sums['cls3']:.2f}%"
+                if sums['unknown'] > 0: code += f"\n  ⚠ 자료없음: {sums['unknown']:.2f}%"
+                st.code(code)
 
                 for d in details:
                     st.write(f"  → {d}")
@@ -627,17 +818,22 @@ for key, label, kws, ph in TOXICITY_FIELDS[3:]:
                 else:
                     st.markdown(f'<div class="calc-box">📌 <b>판정: 분류되지 않음</b></div>', unsafe_allow_html=True)
 
-                if unknown > 0:
-                    st.markdown(f'<div class="warn-box">⚠️ 자료없음 성분 {unknown:.2f}% — 추가 조사 권장</div>', unsafe_allow_html=True)
+                if sums['unknown'] > 0:
+                    st.markdown(f'<div class="warn-box">⚠️ 자료없음 성분 {sums["unknown"]:.2f}% — 추가 조사 권장</div>', unsafe_allow_html=True)
 
                 st.session_state[f'conc_result_{key}'] = recommendation
 
+            # ── 결과 수정 + 확정 ──
             if f'conc_result_{key}' in st.session_state:
-                result_text = st.session_state[f'conc_result_{key}']
-                st.markdown(f"**판정 결과:** {result_text}")
+                st.markdown("---")
+                st.markdown("**최종 판정 결과** (수정 가능):")
+                edited_result = st.text_input(
+                    "판정 결과", value=st.session_state[f'conc_result_{key}'],
+                    key=f"edit_conc_{key}", label_visibility="collapsed")
+
                 if st.button(f"✅ 이 결과를 확정합니다", key=f"confirm_conc_{key}"):
-                    st.session_state.confirmed_classifications[key] = result_text
-                    st.success(f"✅ {label}: {result_text} 확정!")
+                    st.session_state.confirmed_classifications[key] = edited_result
+                    st.success(f"✅ {label}: {edited_result} 확정!")
                     st.rerun()
 
 # ============================================================
@@ -650,7 +846,13 @@ confirmed = st.session_state.confirmed_classifications
 if confirmed:
     for fk, fl, _, _ in TOXICITY_FIELDS:
         if fk in confirmed:
-            st.markdown(f"  ✅ **{fl}**: {confirmed[fk]}")
+            cc1, cc2 = st.columns([4, 1])
+            with cc1:
+                st.markdown(f"  ✅ **{fl}**: {confirmed[fk]}")
+            with cc2:
+                if st.button("↩ 해제", key=f"reset_{fk}"):
+                    del st.session_state.confirmed_classifications[fk]
+                    st.rerun()
 else:
     st.caption("아직 확정된 분류가 없습니다. 위 각 항목에서 계산 후 [확정] 버튼을 눌러주세요.")
 
