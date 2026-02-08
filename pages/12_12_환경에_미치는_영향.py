@@ -141,12 +141,18 @@ def classify_chronic_aquatic(ecmix):
 
 
 def conservative_score(detail, field_key=''):
-    """보수적(독성↑) 순으로 점수 부여. 환경독성은 수치가 낮을수록 독성↑"""
+    """보수적(독성↑) 순으로 점수 부여.
+    ★ 핵심: 정량 데이터(수치) > 정성 데이터(키워드)
+    - 정량: +500 보너스 → 항상 정성보다 우선, 값 낮을수록 독성↑
+    - 정성: 키워드 기반 (최대 ~100)
+    """
     if not detail or detail.strip() in ('자료없음', '해당없음', '(없음)', ''):
         return -9999
     num = extract_numeric(detail)
     if num and num > 0:
-        return 10000.0 / num  # 낮을수록 독성↑ → 역수
+        # 정량 보너스(500) + 역수 → 항상 정성(최대100)보다 높음
+        return 500.0 + (10000.0 / num)
+    # ── 이하 정성 데이터 (최대 ~100점) ──
     dl = detail.lower()
     severe_kw = {
         'toxic': 70, '독성': 70, 'harmful': 60, '유해': 60,
@@ -372,7 +378,12 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
                 else:
                     emoji = "🟢" if r['src'] == 'KOSHA' else "🔵"
                     score = conservative_score(r['detail'], fk)
-                    score_tag = f" `[보수적 점수: {score:.1f}]`" if score > 0 else ""
+                    if score >= 500:
+                        score_tag = f" `📊 정량 [{score:.0f}]`"
+                    elif score > 0:
+                        score_tag = f" `📝 정성 [{score:.0f}]`"
+                    else:
+                        score_tag = ""
                     display = f"{emoji} **{r['src']}** | {r['mat']}: {r['detail'][:160]}{score_tag}"
                 c1, c2 = st.columns([0.05, 0.95])
                 with c1: st.checkbox("선택", key=f"chk12_{idx}", label_visibility="collapsed")
