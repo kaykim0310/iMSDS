@@ -140,6 +140,47 @@ def classify_chronic_aquatic(ecmix):
     return "분류되지 않음"
 
 
+def conservative_score(detail, field_key=''):
+    """보수적(독성↑) 순으로 점수 부여. 환경독성은 수치가 낮을수록 독성↑"""
+    if not detail or detail.strip() in ('자료없음', '해당없음', '(없음)', ''):
+        return -9999
+    num = extract_numeric(detail)
+    if num and num > 0:
+        return 10000.0 / num  # 낮을수록 독성↑ → 역수
+    dl = detail.lower()
+    severe_kw = {
+        'toxic': 70, '독성': 70, 'harmful': 60, '유해': 60,
+        'not classified': 10, '분류되지': 10,
+        '난분해': 65, 'not readily': 65, 'persistent': 65,
+        '이분해': 30, 'readily': 30,
+    }
+    best = 0
+    for kw, sc in severe_kw.items():
+        if kw in dl:
+            best = max(best, sc)
+    return best if best > 0 else 1
+
+
+def auto_select_conservative(all_results, prefix="chk12"):
+    """물질별·항목별로 가장 보수적인 결과 1개씩 자동 선택"""
+    from collections import defaultdict
+    any_manual = any(
+        st.session_state.get(f"{prefix}_{r['idx']}", False)
+        for r in all_results if not r.get('no_data')
+    )
+    if any_manual:
+        return
+    groups = defaultdict(list)
+    for r in all_results:
+        if r.get('no_data'): continue
+        groups[(r['mat'], r['field'])].append(r)
+    for (mat, fk), items in groups.items():
+        if not items: continue
+        scored = [(conservative_score(r['detail'], fk), r) for r in items]
+        scored.sort(key=lambda x: x[0], reverse=True)
+        st.session_state[f"{prefix}_{scored[0][1]['idx']}"] = True
+
+
 # ============================================================
 # 성분 정보 가져오기
 # ============================================================
@@ -312,9 +353,13 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
     # 결과 체크박스
     if 's12_all' in st.session_state and st.session_state['s12_all']:
         all_results = st.session_state['s12_all']
+
+        # ── 자동 보수적 선택 (최초 1회) ──
+        auto_select_conservative(all_results, prefix="chk12")
+
         st.markdown("---")
         st.markdown("### 📊 항목별 데이터 선택")
-        st.info("☑ 원하는 환경값을 체크 → **[선택 반영]** → 아래 ECmix 계산으로 진행")
+        st.info("⚡ **가장 보수적인 값**(독성↑)이 자동 선택되었습니다. 필요 시 수정하세요.")
 
         for fk, fl, _, _ in ENV_FIELDS:
             items_in_field = [r for r in all_results if r['field'] == fk]
@@ -326,7 +371,9 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
                     display = f"⬜ {r['mat']}: 자료없음"
                 else:
                     emoji = "🟢" if r['src'] == 'KOSHA' else "🔵"
-                    display = f"{emoji} **{r['src']}** | {r['mat']}: {r['detail'][:180]}"
+                    score = conservative_score(r['detail'], fk)
+                    score_tag = f" `[보수적 점수: {score:.1f}]`" if score > 0 else ""
+                    display = f"{emoji} **{r['src']}** | {r['mat']}: {r['detail'][:160]}{score_tag}"
                 c1, c2 = st.columns([0.05, 0.95])
                 with c1: st.checkbox("선택", key=f"chk12_{idx}", label_visibility="collapsed")
                 with c2: st.markdown(display)
@@ -511,10 +558,26 @@ with st.expander("🧮 급성 ECmix 계산 (어류/갑각류/조류 중 선택)"
                     st.session_state['ecmix_acute_result'] = f"L(E)C50mix = {ecmix:.4f} mg/L → {classification}"
 
         if 'ecmix_acute_result' in st.session_state:
-            st.markdown(f"**산정 결과:** {st.session_state['ecmix_acute_result']}")
+            st.markdown("---")
+            st.markdown("**최종 판정 결과** (수정 가능):")
+            edited_acute = st.text_input(
+                "판정 결과", value=st.session_state['ecmix_acute_result'],
+                key="edit_ecmix_acute", label_visibility="collapsed")
             if st.button("✅ 급성 수생독성 결과를 확정합니다", key="confirm_ecmix_acute"):
-                st.session_state.confirmed_env_classifications['급성_수생독성'] = st.session_state['ecmix_acute_result']
+                st.session_state.confirmed_env_classifications['급성_수생독성'] = edited_acute
                 st.success("✅ 급성 수생독성 확정!")
+                st.rerun()
+
+        # ── 직접 분류 (계산 없이) ──
+        st.markdown("---")
+        st.markdown("**또는 직접 분류 선택:**")
+        acute_options = ["선택 안 함", "급성 구분 1 (H400)", "분류되지 않음", "자료없음"]
+        direct_acute = st.selectbox("급성 수생독성 직접 분류", acute_options,
+            key="direct_acute_cls", label_visibility="collapsed")
+        if direct_acute != "선택 안 함":
+            if st.button("✅ 직접 분류를 확정합니다", key="confirm_direct_acute"):
+                st.session_state.confirmed_env_classifications['급성_수생독성'] = direct_acute
+                st.success(f"✅ 급성 수생독성: {direct_acute} 확정!")
                 st.rerun()
 
 
@@ -618,10 +681,27 @@ with st.expander("🧮 만성 EqNOECmix 계산 (분해성 고려)", expanded=Fal
                     st.session_state['ecmix_chronic_result'] = f"EqNOECmix = {eq_noec:.4f} mg/L → {classification}"
 
         if 'ecmix_chronic_result' in st.session_state:
-            st.markdown(f"**산정 결과:** {st.session_state['ecmix_chronic_result']}")
+            st.markdown("---")
+            st.markdown("**최종 판정 결과** (수정 가능):")
+            edited_chronic = st.text_input(
+                "판정 결과", value=st.session_state['ecmix_chronic_result'],
+                key="edit_ecmix_chronic", label_visibility="collapsed")
             if st.button("✅ 만성 수생독성 결과를 확정합니다", key="confirm_ecmix_chronic"):
-                st.session_state.confirmed_env_classifications['만성_수생독성'] = st.session_state['ecmix_chronic_result']
+                st.session_state.confirmed_env_classifications['만성_수생독성'] = edited_chronic
                 st.success("✅ 만성 수생독성 확정!")
+                st.rerun()
+
+        # ── 직접 분류 (계산 없이) ──
+        st.markdown("---")
+        st.markdown("**또는 직접 분류 선택:**")
+        chronic_options = ["선택 안 함", "만성 구분 1 (H410)", "만성 구분 2 (H411)",
+                           "만성 구분 3 (H412)", "만성 구분 4 (H413)", "분류되지 않음", "자료없음"]
+        direct_chronic = st.selectbox("만성 수생독성 직접 분류", chronic_options,
+            key="direct_chronic_cls", label_visibility="collapsed")
+        if direct_chronic != "선택 안 함":
+            if st.button("✅ 직접 분류를 확정합니다", key="confirm_direct_chronic"):
+                st.session_state.confirmed_env_classifications['만성_수생독성'] = direct_chronic
+                st.success(f"✅ 만성 수생독성: {direct_chronic} 확정!")
                 st.rerun()
 
 
@@ -645,8 +725,14 @@ st.markdown("### 📋 확정 분류 요약")
 
 confirmed = st.session_state.confirmed_env_classifications
 if confirmed:
-    for ck, cv in confirmed.items():
-        st.markdown(f"  ✅ **{ck}**: {cv}")
+    for ck, cv in list(confirmed.items()):
+        cc1, cc2 = st.columns([4, 1])
+        with cc1:
+            st.markdown(f"  ✅ **{ck}**: {cv}")
+        with cc2:
+            if st.button("↩ 해제", key=f"reset_env_{ck}"):
+                del st.session_state.confirmed_env_classifications[ck]
+                st.rerun()
 else:
     st.caption("아직 확정된 분류가 없습니다. 위 ECmix 계산 후 [확정] 버튼을 눌러주세요.")
 
