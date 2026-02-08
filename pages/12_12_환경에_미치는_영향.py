@@ -28,16 +28,49 @@ st.markdown('<div class="section-header"><h2>12. 환경에 미치는 영향</h2>
 # ============================================================
 if 'section12_data' not in st.session_state:
     st.session_state.section12_data = {
-        '가_생태독성': '', '나_잔류성_및_분해성': '', '다_생물_농축성': '',
+        '가1_급성_수생독성_어류': '', '가2_급성_수생독성_갑각류': '', '가3_급성_수생독성_조류': '',
+        '가4_만성_수생독성': '',
+        '나_잔류성_및_분해성': '', '다_생물_농축성': '',
         '라_토양_이동성': '', '마_기타_유해_영향': ''
     }
 
+# 환경 항목: (키, 한글명, 매칭 키워드(한글+영문), placeholder)
 ENV_FIELDS = [
-    ('가_생태독성', '가. 생태독성', ['어류', '갑각류', '조류', '수생', '생태', 'LC50', 'EC50', 'fish', 'daphn', 'alga'], "예: 어류 LC50=10mg/L (96hr)"),
-    ('나_잔류성_및_분해성', '나. 잔류성 및 분해성', ['잔류', '분해', 'log Kow', 'BOD', 'COD', 'biodeg', 'half-life', '반감기'], "예: log Kow=2.73"),
-    ('다_생물_농축성', '다. 생물 농축성', ['농축', 'BCF', '생분해', 'bioconcentrat', 'octanol'], "예: BCF=90"),
-    ('라_토양_이동성', '라. 토양 이동성', ['토양', '이동', 'Koc', 'soil', 'adsorption'], "예: Koc=자료없음"),
-    ('마_기타_유해_영향', '마. 기타 유해 영향', ['기타', '오존', '만성', 'atmospheric'], "예: 오존층파괴물질 해당없음"),
+    ('가1_급성_수생독성_어류', '가. 생태독성 - 급성 수생독성 (어류)',
+     ['어류', 'fish', 'rainbow', 'fathead', 'bluegill', 'oncorhynchus',
+      'pimephales', 'danio', 'oryzias', 'lepomis', 'salmo',
+      '급성 수생독성 (어류)'],
+     "예: LC50 = 8.3 mg/L (96hr, Rainbow trout)"),
+    ('가2_급성_수생독성_갑각류', '가. 생태독성 - 급성 수생독성 (갑각류)',
+     ['갑각류', 'daphn', 'crustacea', 'mysid', 'ceriodaphnia',
+      'americamysis', 'gammarus', 'hyalella',
+      '급성 수생독성 (갑각류)'],
+     "예: EC50 = 5 mg/L (48hr, Daphnia magna)"),
+    ('가3_급성_수생독성_조류', '가. 생태독성 - 급성 수생독성 (조류)',
+     ['조류', 'alga', 'selenastrum', 'desmodesmus', 'pseudokirchneriella',
+      'chlorella', 'scenedesmus', 'skeletonema',
+      '급성 수생독성 (조류)'],
+     "예: EC50 = 11 mg/L (72hr, Desmodesmus subspicatus)"),
+    ('가4_만성_수생독성', '가. 생태독성 - 만성 수생독성',
+     ['만성', 'chronic', 'NOEC', 'LOEC', 'long-term',
+      '만성 수생독성'],
+     "예: NOEC = 0.02 mg/L (21d, Daphnia magna)"),
+    ('나_잔류성_및_분해성', '나. 잔류성 및 분해성',
+     ['잔류', '분해', 'log Kow', 'BOD', 'COD', 'biodeg', 'half-life', '반감기',
+      'Biodegradation', 'Environmental Fate', 'Abiotic', 'persistence',
+      'hydrolysis', 'photolysis'],
+     "예: log Kow=2.73, 이분해성"),
+    ('다_생물_농축성', '다. 생물 농축성',
+     ['농축', 'BCF', '생분해', 'bioconcentrat', 'Bioaccumulation',
+      'Octanol', 'log P', 'partition coefficient'],
+     "예: BCF=90"),
+    ('라_토양_이동성', '라. 토양 이동성',
+     ['토양', '이동', 'Koc', 'soil', 'adsorption', 'mobility',
+      'Soil Adsorption', 'Mobility in Soil'],
+     "예: Koc=자료없음"),
+    ('마_기타_유해_영향', '마. 기타 유해 영향',
+     ['기타', '오존', 'atmospheric', 'ozone', 'Other Coverage'],
+     "예: 오존층파괴물질 해당없음"),
 ]
 
 
@@ -104,11 +137,50 @@ def query_pubchem(cas_no):
 
 
 def classify_item(item_name, detail=""):
-    """항목명+내용을 환경 필드 키로 매핑"""
-    combined = (item_name + " " + detail).lower()
+    """항목명+내용을 환경 필드 키로 매핑 (급성/만성 수생독성 구분)"""
+    combined = (item_name + " " + detail).strip()
+    cl = combined.lower()
+
+    # ── 1단계: 수생독성 판별 (급성/만성 + 종 구분) ──
+    is_aquatic = any(k in cl for k in [
+        "어류", "갑각류", "조류", "수생", "생태", "ecotox",
+        "lc50", "ec50", "ic50", "noec", "loec",
+        "fish", "daphn", "alga", "crustacea", "aquatic",
+        "rainbow", "fathead", "bluegill", "mysid", "selenastrum",
+        "oncorhynchus", "pimephales", "danio", "oryzias",
+        "ceriodaphnia", "americamysis", "desmodesmus", "chlorella",
+    ])
+
+    if is_aquatic:
+        # 만성 여부 판별
+        is_chronic = any(k in cl for k in [
+            "만성", "chronic", "noec", "loec", "long-term",
+            "21 day", "28 day", "21d", "28d", "reproduction",
+        ])
+        if is_chronic:
+            return '가4_만성_수생독성'
+
+        # 급성 - 종 구분
+        if any(k in cl for k in ["어류", "fish", "rainbow", "fathead", "bluegill",
+                                   "oncorhynchus", "pimephales", "danio", "oryzias",
+                                   "lepomis", "salmo"]):
+            return '가1_급성_수생독성_어류'
+        if any(k in cl for k in ["갑각류", "daphn", "crustacea", "mysid",
+                                   "ceriodaphnia", "americamysis", "gammarus", "hyalella"]):
+            return '가2_급성_수생독성_갑각류'
+        if any(k in cl for k in ["조류", "alga", "selenastrum", "desmodesmus",
+                                   "pseudokirchneriella", "chlorella", "scenedesmus",
+                                   "skeletonema"]):
+            return '가3_급성_수생독성_조류'
+        # 종 불명확 → 급성 어류(기본)
+        return '가1_급성_수생독성_어류'
+
+    # ── 2단계: 나머지 항목 키워드 매칭 ──
     for key, label, keywords, _ in ENV_FIELDS:
+        if key.startswith('가'):  # 수생독성은 위에서 이미 처리
+            continue
         for kw in keywords:
-            if kw.lower() in combined:
+            if kw.lower() in cl:
                 return key
     return None
 
@@ -136,6 +208,8 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
 
         if st.button("🔍 KOSHA + 국제DB 동시 조회", type="primary", key="dual_query_s12"):
             all_results = []
+            mat_field_found = {m['name']: set() for m in mat_info}
+
             prog = st.progress(0)
             total = len(cas_list) * 2
             step = 0
@@ -153,6 +227,7 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
                                 'src': 'KOSHA', 'field': fk,
                                 'label': item['name'], 'detail': item['detail']
                             })
+                            mat_field_found[m['name']].add(fk)
                 step += 1
                 time.sleep(0.3)
 
@@ -168,8 +243,20 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
                                 'src': 'PubChem', 'field': fk,
                                 'label': item['name'], 'detail': item['detail']
                             })
+                            mat_field_found[m['name']].add(fk)
                 step += 1
                 time.sleep(0.3)
+
+            # ── 수정3: 데이터가 없는 물질+항목에 "자료없음" 추가 ──
+            for m in mat_info:
+                for fk, fl, _, _ in ENV_FIELDS:
+                    if fk not in mat_field_found[m['name']]:
+                        all_results.append({
+                            'mat': m['name'], 'cas': m['cas'],
+                            'src': '-', 'field': fk,
+                            'label': fl, 'detail': '자료없음',
+                            'no_data': True
+                        })
 
             prog.progress(1.0, "✅ 조회 완료!")
 
@@ -198,12 +285,16 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
 
             for r in items_in_field:
                 idx = r['idx']
-                src_emoji = "🟢" if r['src'] == 'KOSHA' else "🔵"
-                src_label = r['src']
+                is_no_data = r.get('no_data', False)
                 mat_name = r['mat']
                 detail = r['detail']
 
-                display_text = f"{src_emoji} **[{src_label}]** {mat_name}: {detail[:150]}"
+                if is_no_data:
+                    display_text = f"⬜ {mat_name}: 자료없음"
+                else:
+                    src_emoji = "🟢" if r['src'] == 'KOSHA' else "🔵"
+                    src_label = r['src']
+                    display_text = f"{src_emoji} **{src_label}** | {mat_name}: {detail[:200]}"
 
                 col_chk, col_txt = st.columns([0.05, 0.95])
                 with col_chk:
@@ -222,7 +313,10 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
                 idx = r['idx']
                 if st.session_state.get(f"chk12_{idx}", False):
                     fk = r['field']
-                    selected_by_field[fk].append(f"[{r['src']}] {r['mat']}: {r['detail']}")
+                    mat = r['mat']
+                    detail = r['detail']
+                    # ── 수정1: [PubChem], [KOSHA] 태그 없이 반영 ──
+                    selected_by_field[fk].append(f"{mat}: {detail}")
 
             applied_count = 0
             for fk, _, _, _ in ENV_FIELDS:
@@ -249,13 +343,7 @@ st.markdown("### ✍️ 환경 영향 정보 입력")
 
 for key, label, _, ph in ENV_FIELDS:
     cur = st.session_state.section12_data.get(key, '')
-    tag = ""
-    if cur:
-        if "[KOSHA]" in cur and "[PubChem]" in cur: tag = " 🟢🔵"
-        elif "[KOSHA]" in cur: tag = " 🟢"
-        elif "[PubChem]" in cur: tag = " 🔵"
-        elif cur.strip() not in ("", "자료없음"): tag = " ✏️"
-    st.markdown(f'<div class="subsection-header">{label}{tag}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="subsection-header">{label}</div>', unsafe_allow_html=True)
     val = st.text_area(label, value=cur, height=120 if '생태독성' in label else 100,
         placeholder=ph, key=f"s12_{key}", label_visibility="collapsed")
     st.session_state.section12_data[key] = val
