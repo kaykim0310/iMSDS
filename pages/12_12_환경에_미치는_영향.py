@@ -68,7 +68,7 @@ def query_kosha(cas_no):
 
 
 def query_echa(cas_no):
-    """ECHA API 섹션 12 조회"""
+    """PubChem API 섹션 12 조회"""
     try:
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         from echa_api import get_environmental_info, search_substance
@@ -108,8 +108,8 @@ def organize_results(raw_items, material_name=""):
 # ============================================================
 # API 연동 UI
 # ============================================================
-with st.expander("🔍 KOSHA + ECHA 동시 조회 (클릭)", expanded=False):
-    st.markdown("섹션 3의 CAS 번호로 **🟢KOSHA(한국)**와 **🔵ECHA(유럽)** 환경 데이터를 동시 조회합니다.")
+with st.expander("🔍 KOSHA + 국제DB 동시 조회 (클릭)", expanded=False):
+    st.markdown("섹션 3의 CAS 번호로 **🟢KOSHA(한국)**와 **🔵 국제DB(PubChem)** 환경 데이터를 동시 조회합니다.")
     
     cas_list, mat_info = [], []
     if 'section3_data' in st.session_state:
@@ -122,7 +122,7 @@ with st.expander("🔍 KOSHA + ECHA 동시 조회 (클릭)", expanded=False):
         st.success(f"✅ {len(cas_list)}개 물질 발견")
         for m in mat_info: st.write(f"  • **{m['name']}** (CAS: {m['cas']})")
         
-        if st.button("🔍 KOSHA + ECHA 동시 조회", type="primary", key="dual_query"):
+        if st.button("🔍 KOSHA + 국제DB 동시 조회", type="primary", key="dual_query"):
             k_results, e_results = [], []
             prog = st.progress(0)
             total = len(cas_list) * 2
@@ -131,7 +131,7 @@ with st.expander("🔍 KOSHA + ECHA 동시 조회 (클릭)", expanded=False):
                 prog.progress(step / total, f"🟢 KOSHA: {m['name']}...")
                 kr = query_kosha(m['cas']); kr['mat'] = m['name']; k_results.append(kr)
                 step += 1; time.sleep(0.3)
-                prog.progress(step / total, f"🔵 ECHA: {m['name']}...")
+                prog.progress(step / total, f"🔵 국제DB: {m['name']}...")
                 er = query_echa(m['cas']); er['mat'] = m['name']; e_results.append(er)
                 step += 1; time.sleep(0.3)
             prog.progress(1.0, "✅ 완료!")
@@ -170,12 +170,12 @@ with st.expander("🔍 KOSHA + ECHA 동시 조회 (클릭)", expanded=False):
                 if kt: st.markdown(f'<div class="kosha-box">🟢 KOSHA<br>{kt.replace(chr(10), "<br>")}</div>', unsafe_allow_html=True)
                 else: st.caption("🟢 KOSHA: 데이터 없음")
             with c2:
-                if et: st.markdown(f'<div class="echa-box">🔵 ECHA<br>{et.replace(chr(10), "<br>")}</div>', unsafe_allow_html=True)
-                else: st.caption("🔵 ECHA: 데이터 없음")
+                if et: st.markdown(f'<div class="echa-box">🔵 국제DB<br>{et.replace(chr(10), "<br>")}</div>', unsafe_allow_html=True)
+                else: st.caption("🔵 국제DB: 데이터 없음")
             
             opts = []
             if kt: opts.append("🟢 KOSHA")
-            if et: opts.append("🔵 ECHA")
+            if et: opts.append("🔵 국제DB")
             if kt and et: opts.append("🟡 병합")
             opts.append("✏️ 직접입력")
             
@@ -189,11 +189,11 @@ with st.expander("🔍 KOSHA + ECHA 동시 조회 (클릭)", expanded=False):
                 ch = s.get('choice', '')
                 if '직접' in ch: continue
                 if 'KOSHA' in ch: val = s.get('k', '')
-                elif 'ECHA' in ch: val = s.get('e', '')
+                elif '국제DB' in ch: val = s.get('e', '')
                 elif '병합' in ch:
                     parts = []
                     if s.get('k'): parts.append(f"[KOSHA] {s['k']}")
-                    if s.get('e'): parts.append(f"[ECHA] {s['e']}")
+                    if s.get('e'): parts.append(f"[PubChem] {s['e']}")
                     val = chr(10).join(parts)
                 else: continue
                 if val:
@@ -215,7 +215,7 @@ for key, label, _, ph in ENV_FIELDS:
     tag = ""
     if cur:
         if "[KOSHA]" in cur: tag = " 🟢"
-        elif "ECHA" in cur: tag = " 🔵"
+        elif "국제DB" in cur: tag = " 🔵"
         elif cur.strip() not in ("", "자료없음"): tag = " ✏️"
     st.markdown(f'<div class="subsection-header">{label}{tag}</div>', unsafe_allow_html=True)
     val = st.text_area(label, value=cur, height=120 if '생태독성' in label else 100, placeholder=ph, key=f"s12_{key}", label_visibility="collapsed")
