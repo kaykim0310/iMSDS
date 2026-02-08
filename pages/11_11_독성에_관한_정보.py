@@ -162,7 +162,31 @@ def _is_valid(detail):
 
 
 def extract_numeric(text):
-    """텍스트에서 첫 번째 숫자값 추출 (LD50 = 5800 mg/kg → 5800.0)"""
+    """텍스트에서 LD50/LC50 수치를 추출한다.
+    예: 'LD50 270 mg/kg' → 270.0
+        'LD50 = 5800 mg/kg' → 5800.0
+        'LD50 >5000 mg/kg' → 5000.0
+        'LC50 76 mg/L (4hr)' → 76.0
+    """
+    if not text:
+        return None
+    # &gt; → >, &lt; → < 변환
+    text = text.replace('&gt;', '>').replace('&lt;', '<')
+    # LD50/LC50 뒤의 숫자를 우선 추출
+    m = re.search(r'(?:LD50|LC50|EC50|ATE)\s*[=:>< ]*\s*([\d,]+\.?\d*)', text, re.IGNORECASE)
+    if m:
+        try:
+            return float(m.group(1).replace(',', ''))
+        except ValueError:
+            pass
+    # 일반 숫자 추출 (단위 mg/kg, mg/L 앞의 숫자)
+    m = re.search(r'([\d,]+\.?\d*)\s*(?:mg/kg|mg/L|ppm|mg/m)', text, re.IGNORECASE)
+    if m:
+        try:
+            return float(m.group(1).replace(',', ''))
+        except ValueError:
+            pass
+    # 최후: 아무 숫자나
     m = re.search(r'[\d,]+\.?\d*', text.replace(',', ''))
     if m:
         try:
@@ -399,29 +423,56 @@ for route_key, route_label, route_kws, route_ph in TOXICITY_FIELDS[:3]:
         if not components:
             st.warning("섹션 3에 성분이 없습니다.")
         else:
+            # ── 텍스트 영역에서 성분별 독성값 자동 추출 ──
+            auto_ate = {}
+            if val:
+                for line in val.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    for comp in components:
+                        if comp['name'] in line:
+                            # 전체 라인에서 LD50/LC50 수치 추출
+                            # 예: "포름알데히드: LD50 270 mg/kg 실험종 : Rabbit|..."
+                            num = extract_numeric(line)
+                            if num and num > 0:
+                                auto_ate[comp['name']] = num
+
+            # 자동추출값을 session_state에 미리 세팅 (아직 0이거나 없을 때만)
+            for i, comp in enumerate(components):
+                ss_key = f"ate_val_{route_key}_{i}"
+                if comp['name'] in auto_ate:
+                    if ss_key not in st.session_state or st.session_state[ss_key] == 0.0:
+                        st.session_state[ss_key] = auto_ate[comp['name']]
+
             st.markdown("**성분별 ATE 입력:**")
+            # 컬럼 헤더
+            hc1, hc2, hc3, hc4 = st.columns([2, 1, 2, 1.5])
+            with hc1: st.caption("성분명")
+            with hc2: st.caption("함유량(%)")
+            with hc3: st.caption("ATE값 (LD50/LC50)")
+            with hc4: st.caption("구분변환")
+
             ate_data = []
             for i, comp in enumerate(components):
                 c1, c2, c3, c4 = st.columns([2, 1, 2, 1.5])
+
+                ss_key = f"ate_val_{route_key}_{i}"
+
                 with c1:
-                    st.text(f"{comp['name']}")
+                    ate_badge = ""
+                    if comp['name'] in auto_ate:
+                        ate_badge = f" ← **{auto_ate[comp['name']]}** 자동추출"
+                    st.markdown(f"{comp['name']}{ate_badge}")
                 with c2:
                     pct = st.number_input("함유량(%)", value=comp['pct'] or 0.0,
                         min_value=0.0, max_value=100.0, step=0.1,
                         key=f"ate_pct_{route_key}_{i}", label_visibility="collapsed")
                 with c3:
-                    ate_hint = ""
-                    # 입력란의 데이터에서 수치 자동 추출 시도
-                    if val:
-                        for line in val.split('\n'):
-                            if comp['name'] in line:
-                                num = extract_numeric(line.split(':')[-1] if ':' in line else line)
-                                if num: ate_hint = f"(추출값: {num})"
-                    ate_val = st.number_input(f"ATE값 {ate_hint}",
+                    ate_val = st.number_input("ATE값",
                         value=0.0, min_value=0.0, step=0.1, format="%.2f",
-                        key=f"ate_val_{route_key}_{i}", label_visibility="collapsed")
+                        key=ss_key, label_visibility="collapsed")
                 with c4:
-                    # 구분 변환 셀렉트
                     conv_options = ["직접입력"] + list(ATE_CONVERSION.get(route_type, {}).keys())
                     conv_sel = st.selectbox("구분변환", conv_options,
                         key=f"ate_conv_{route_key}_{i}", label_visibility="collapsed")
