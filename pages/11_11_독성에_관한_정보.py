@@ -133,6 +133,103 @@ FIELD_CONFIG = {
 }
 
 
+# ============================================================
+# 발암성 기관별 분류체계
+# ============================================================
+CARCINOGEN_AGENCIES = {
+    '산업안전보건법': {
+        'label': '산업안전보건법',
+        'options': ["해당없음", "구분 1A (알려진 인체 발암성 물질)", "구분 1B (인체 발암성 추정 물질)", "구분 2 (인체 발암성 의심 물질)", "분류되지 않음", "자료없음"],
+        'short_options': ["해당없음", "구분 1A", "구분 1B", "구분 2", "분류되지 않음", "자료없음"],
+    },
+    '고용노동부고시': {
+        'label': '고용노동부 고시',
+        'options': ["해당없음", "구분 1A (알려진 인체 발암성 물질)", "구분 1B (인체 발암성 추정 물질)", "구분 2 (인체 발암성 의심 물질)", "분류되지 않음", "자료없음"],
+        'short_options': ["해당없음", "구분 1A", "구분 1B", "구분 2", "분류되지 않음", "자료없음"],
+    },
+    'IARC': {
+        'label': 'IARC (국제암연구소)',
+        'options': ["해당없음", "Group 1 (인체 발암성 확인)", "Group 2A (인체 발암성 추정)", "Group 2B (인체 발암성 가능)", "Group 3 (인체 발암성 미분류)", "자료없음"],
+        'short_options': ["해당없음", "Group 1", "Group 2A", "Group 2B", "Group 3", "자료없음"],
+    },
+    'OSHA': {
+        'label': 'OSHA (미국산업안전보건청)',
+        'options': ["해당없음", "Listed (발암성 물질 목록)", "Not Listed", "자료없음"],
+        'short_options': ["해당없음", "Listed", "Not Listed", "자료없음"],
+    },
+    'ACGIH': {
+        'label': 'ACGIH (미국산업위생전문가협의회)',
+        'options': ["해당없음", "A1 (인체 발암성 확인)", "A2 (인체 발암성 의심)", "A3 (동물 발암성 확인)", "A4 (인체 발암성 미분류)", "A5 (인체 발암성 의심 안됨)", "자료없음"],
+        'short_options': ["해당없음", "A1", "A2", "A3", "A4", "A5", "자료없음"],
+    },
+    'NTP': {
+        'label': 'NTP (미국독성프로그램)',
+        'options': ["해당없음", "Known (인체 발암성 물질)", "RAHC (합리적으로 인체 발암성 예상)", "Not Listed", "자료없음"],
+        'short_options': ["해당없음", "Known", "RAHC", "Not Listed", "자료없음"],
+    },
+    'EU_CLP': {
+        'label': 'EU CLP',
+        'options': ["해당없음", "Carc. 1A (알려진 인체 발암성)", "Carc. 1B (추정 인체 발암성)", "Carc. 2 (의심되는 인체 발암성)", "분류되지 않음", "자료없음"],
+        'short_options': ["해당없음", "Carc. 1A", "Carc. 1B", "Carc. 2", "분류되지 않음", "자료없음"],
+    },
+    '환경부': {
+        'label': '환경부 (화학물질등록평가법)',
+        'options': ["해당없음", "구분 1A (알려진 인체 발암성 물질)", "구분 1B (인체 발암성 추정 물질)", "구분 2 (인체 발암성 의심 물질)", "분류되지 않음", "자료없음"],
+        'short_options': ["해당없음", "구분 1A", "구분 1B", "구분 2", "분류되지 않음", "자료없음"],
+    },
+    'NITE': {
+        'label': 'NITE (일본기술종합연구소)',
+        'options': ["해당없음", "구분 1A (알려진 인체 발암성 물질)", "구분 1B (인체 발암성 추정 물질)", "구분 2 (인체 발암성 의심 물질)", "분류되지 않음", "자료없음"],
+        'short_options': ["해당없음", "구분 1A", "구분 1B", "구분 2", "분류되지 않음", "자료없음"],
+    },
+}
+
+# 기관별 발암성 → GHS 구분 매핑 (혼합물 분류 판정용)
+CARCINOGEN_TO_GHS = {
+    # 산업안전보건법 / 고용노동부 고시
+    "구분 1A (알려진 인체 발암성 물질)": "구분 1A", "구분 1A": "구분 1A",
+    "구분 1B (인체 발암성 추정 물질)": "구분 1B", "구분 1B": "구분 1B",
+    "구분 2 (인체 발암성 의심 물질)": "구분 2", "구분 2": "구분 2",
+    # IARC
+    "Group 1 (인체 발암성 확인)": "구분 1A", "Group 1": "구분 1A",
+    "Group 2A (인체 발암성 추정)": "구분 1B", "Group 2A": "구분 1B",
+    "Group 2B (인체 발암성 가능)": "구분 2", "Group 2B": "구분 2",
+    "Group 3 (인체 발암성 미분류)": "해당없음",
+    # OSHA
+    "Listed (발암성 물질 목록)": "구분 1A",
+    "Listed": "구분 1A",
+    # ACGIH
+    "A1 (인체 발암성 확인)": "구분 1A", "A1": "구분 1A",
+    "A2 (인체 발암성 의심)": "구분 1B", "A2": "구분 1B",
+    "A3 (동물 발암성 확인)": "구분 2", "A3": "구분 2",
+    "A4 (인체 발암성 미분류)": "해당없음",
+    "A5 (인체 발암성 의심 안됨)": "해당없음",
+    # NTP
+    "Known (인체 발암성 물질)": "구분 1A", "Known": "구분 1A",
+    "RAHC (합리적으로 인체 발암성 예상)": "구분 1B", "RAHC": "구분 1B",
+    # EU CLP
+    "Carc. 1A (알려진 인체 발암성)": "구분 1A", "Carc. 1A": "구분 1A",
+    "Carc. 1B (추정 인체 발암성)": "구분 1B", "Carc. 1B": "구분 1B",
+    "Carc. 2 (의심되는 인체 발암성)": "구분 2", "Carc. 2": "구분 2",
+}
+
+# GHS 구분 → 보수성 순위 (높을수록 보수적)
+GHS_CARCINOGEN_RANK = {"구분 1A": 4, "구분 1B": 3, "구분 2": 2, "분류되지 않음": 1, "해당없음": 0, "자료없음": -1}
+
+
+def get_most_conservative_ghs(agency_selections):
+    """물질 1개의 기관별 선택값에서 가장 보수적인 GHS 구분 반환"""
+    best_ghs = "해당없음"
+    best_rank = -1
+    for agency_key, sel_val in agency_selections.items():
+        ghs = CARCINOGEN_TO_GHS.get(sel_val, "해당없음")
+        rank = GHS_CARCINOGEN_RANK.get(ghs, 0)
+        if rank > best_rank:
+            best_rank = rank
+            best_ghs = ghs
+    return best_ghs
+
+
 def _is_cls1(cls_str):
     """구분 1 계열인지 판정"""
     return cls_str in ['구분 1', '구분 1A', '구분 1B', '구분 1C',
@@ -262,6 +359,10 @@ if 'section11_data' not in st.session_state:
 
 if 'confirmed_classifications' not in st.session_state:
     st.session_state.confirmed_classifications = {}
+
+# 발암성 기관별 물질별 데이터 초기화
+if 'carcinogen_agency_data' not in st.session_state:
+    st.session_state.carcinogen_agency_data = {}  # {물질명: {기관key: 선택값}}
 
 TOXICITY_FIELDS = [
     ('급성독성_경구', '급성독성 (경구)', ['경구', 'oral', 'Acute Oral', 'ingestion'], "예: LD50 = 5800 mg/kg (Rat)"),
@@ -763,6 +864,235 @@ for route_key, route_label, route_kws, route_ph in TOXICITY_FIELDS[:3]:
 
 # ── 나머지 항목: 함유량 기준 분류 ──
 for key, label, kws, ph in TOXICITY_FIELDS[3:]:
+
+    # ============================================================
+    # 발암성 항목: 물질별 기관별 분류 결과 입력 UI
+    # ============================================================
+    if key == '발암성':
+        st.markdown(f'<div class="field-header">📋 {label}</div>', unsafe_allow_html=True)
+        cur = st.session_state.section11_data['나_건강_유해성_정보'].get(key, '')
+        val = st.text_area(label, value=cur, height=80, placeholder=ph or "조회 결과가 여기에 표시됩니다.",
+            key=f"s11_{key}", label_visibility="collapsed")
+        st.session_state.section11_data['나_건강_유해성_정보'][key] = val
+
+        is_confirmed = st.session_state.confirmed_classifications.get(key)
+        if is_confirmed:
+            st.markdown(f'<div class="result-box">✅ <b>확정 분류:</b> {is_confirmed} <span class="confirm-badge">CONFIRMED</span></div>', unsafe_allow_html=True)
+
+        # ── 기관별 발암성 분류 입력 패널 ──
+        if components:
+            with st.expander(f"🏛️ 기관별 발암성 분류 결과 입력 ({len(components)}개 물질)", expanded=False):
+                st.markdown("""
+                <div class="calc-box">
+                <b>물질별 기관별 발암성 분류</b><br>
+                <small>각 성분의 발암성 분류를 7개 기관 기준으로 입력합니다.<br>
+                가장 보수적인(위험한) 기관 결과가 혼합물 분류에 자동 반영됩니다.</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # 물질별 탭 생성
+                comp_tabs = st.tabs([f"🔬 {comp['name']}" for comp in components])
+
+                for ci, (comp, tab) in enumerate(zip(components, comp_tabs)):
+                    with tab:
+                        pct_display = f"{comp['pct']}%" if comp['pct'] is not None else "미입력"
+                        st.markdown(f"**{comp['name']}** (CAS: {comp['cas']}, 함유량: {pct_display})")
+
+                        # 기관별 선택 영역
+                        agency_selections = {}
+                        for ag_key, ag_cfg in CARCINOGEN_AGENCIES.items():
+                            ss_key = f"carc_{ci}_{ag_key}"
+
+                            # session_state에서 기존 값 복원
+                            prev = st.session_state.carcinogen_agency_data.get(comp['name'], {}).get(ag_key, "해당없음")
+                            if ss_key not in st.session_state:
+                                idx = 0
+                                if prev in ag_cfg['options']:
+                                    idx = ag_cfg['options'].index(prev)
+                                # st.session_state에 직접 설정하지 않고 index로 전달
+                            else:
+                                idx = ag_cfg['options'].index(st.session_state[ss_key]) if st.session_state[ss_key] in ag_cfg['options'] else 0
+
+                            c_label, c_sel = st.columns([1.5, 3])
+                            with c_label:
+                                st.markdown(f"**{ag_cfg['label']}**")
+                            with c_sel:
+                                sel = st.selectbox(
+                                    ag_cfg['label'],
+                                    ag_cfg['options'],
+                                    index=idx,
+                                    key=ss_key,
+                                    label_visibility="collapsed"
+                                )
+                            agency_selections[ag_key] = sel
+
+                        # session_state에 저장
+                        st.session_state.carcinogen_agency_data[comp['name']] = agency_selections
+
+                        # 이 물질의 가장 보수적 GHS 구분 표시
+                        best_ghs = get_most_conservative_ghs(agency_selections)
+
+                        # 기관별 결과 요약 테이블
+                        st.markdown("---")
+                        active_agencies = []
+                        for ag_key, sel_val in agency_selections.items():
+                            if sel_val not in ("해당없음", "자료없음"):
+                                ghs = CARCINOGEN_TO_GHS.get(sel_val, "-")
+                                active_agencies.append(f"**{CARCINOGEN_AGENCIES[ag_key]['label']}**: {sel_val} → GHS {ghs}")
+
+                        if active_agencies:
+                            summary_text = " / ".join(active_agencies)
+                            if best_ghs in ("구분 1A", "구분 1B"):
+                                st.markdown(f'<div class="warn-box">⚠️ {summary_text}<br>→ 최보수 판정: <b>{best_ghs}</b></div>', unsafe_allow_html=True)
+                            elif best_ghs == "구분 2":
+                                st.markdown(f'<div class="calc-box">📌 {summary_text}<br>→ 최보수 판정: <b>{best_ghs}</b></div>', unsafe_allow_html=True)
+                            else:
+                                st.markdown(f'<div class="result-box">✅ {summary_text}<br>→ 판정: <b>{best_ghs}</b></div>', unsafe_allow_html=True)
+                        else:
+                            st.caption("아직 선택된 기관별 분류가 없습니다.")
+
+                # ── 전체 물질 요약 + 혼합물 분류 자동 판정 ──
+                st.markdown("---")
+                st.markdown("### 📊 발암성 혼합물 분류 자동 판정")
+
+                comp_class_data_carc = []
+                summary_rows = []
+                for ci, comp in enumerate(components):
+                    ag_sels = st.session_state.carcinogen_agency_data.get(comp['name'], {})
+                    best_ghs = get_most_conservative_ghs(ag_sels)
+                    pct = comp['pct'] or 0.0
+
+                    # 기관별 비해당 제외 요약 생성
+                    active_list = []
+                    for ag_key, sel_val in ag_sels.items():
+                        if sel_val not in ("해당없음", "자료없음"):
+                            active_list.append(f"{CARCINOGEN_AGENCIES[ag_key]['label']}: {sel_val}")
+
+                    agency_detail = " | ".join(active_list) if active_list else "발암성 분류 없음"
+                    summary_rows.append({
+                        'name': comp['name'], 'pct': pct, 'ghs': best_ghs, 'detail': agency_detail
+                    })
+                    comp_class_data_carc.append({'name': comp['name'], 'pct': pct, 'cls': best_ghs})
+
+                # 요약 테이블 표시
+                for row in summary_rows:
+                    ghs_emoji = "🔴" if "1" in row['ghs'] else ("🟡" if "2" in row['ghs'] else "⚪")
+                    st.markdown(f"  {ghs_emoji} **{row['name']}** ({row['pct']}%) → **{row['ghs']}** — {row['detail']}")
+
+                # 자동 판정 버튼
+                st.markdown("---")
+                if st.button("📊 발암성 혼합물 분류 판정", key="calc_carc_agency"):
+                    recommendation, details, sums = judge_classification('발암성', comp_class_data_carc)
+
+                    st.markdown("**함유량 합산:**")
+                    code = f"  구분1 (1A+1B) 합계: {sums['cls1']:.2f}%\n  구분2 합계: {sums['cls2']:.2f}%"
+                    if sums['unknown'] > 0: code += f"\n  ⚠ 자료없음: {sums['unknown']:.2f}%"
+                    st.code(code)
+
+                    for d in details:
+                        st.write(f"  → {d}")
+
+                    if recommendation != "분류되지 않음":
+                        st.markdown(f'<div class="result-box">📌 <b>판정: {recommendation}</b></div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'<div class="calc-box">📌 <b>판정: 분류되지 않음</b></div>', unsafe_allow_html=True)
+
+                    st.session_state[f'conc_result_{key}'] = recommendation
+
+                    # 텍스트 영역에 기관별 결과 자동 반영
+                    carc_text_lines = []
+                    for row in summary_rows:
+                        if row['ghs'] not in ("해당없음", "자료없음"):
+                            carc_text_lines.append(f"{row['name']}: {row['detail']}")
+                    if carc_text_lines:
+                        combined_text = "\n".join(carc_text_lines)
+                        st.session_state.section11_data['나_건강_유해성_정보']['발암성'] = combined_text
+                        wk = f"s11_발암성"
+                        if wk in st.session_state:
+                            st.session_state[wk] = combined_text
+
+                # ── 결과 수정 + 확정 ──
+                if f'conc_result_{key}' in st.session_state:
+                    st.markdown("---")
+                    st.markdown("**최종 판정 결과** (수정 가능):")
+                    edited_result = st.text_input(
+                        "판정 결과", value=st.session_state[f'conc_result_{key}'],
+                        key=f"edit_conc_{key}", label_visibility="collapsed")
+
+                    if st.button(f"✅ 이 결과를 확정합니다", key=f"confirm_conc_{key}"):
+                        st.session_state.confirmed_classifications[key] = edited_result
+                        st.success(f"✅ {label}: {edited_result} 확정!")
+                        st.rerun()
+
+        # ── 기존 함유량 기준 분류 패널도 유지 (성분이 없거나 대체 사용 시) ──
+        if key in FIELD_CONFIG and components:
+            cfg = FIELD_CONFIG[key]
+            with st.expander(f"📐 함유량 기준 수동 분류 ({label}) — 기관별 입력을 사용하지 않을 경우", expanded=False):
+                st.markdown(f"""
+                <div class="calc-box">
+                <b>{cfg['desc']}</b> - 혼합물 분류 (수동 구분 선택)<br>
+                <small>위 기관별 입력 대신 직접 GHS 구분을 선택합니다.</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.markdown("**분류 기준:**")
+                for rt in cfg['rules_text']:
+                    st.write(f"  • {rt}")
+
+                st.markdown("---")
+                st.markdown("**성분별 해당 구분 정보 입력:**")
+
+                comp_class_data = []
+                for i, comp in enumerate(components):
+                    c1, c2, c3 = st.columns([2, 1.5, 2])
+                    with c1:
+                        pct_display = f"{comp['pct']}%" if comp['pct'] is not None else "미입력"
+                        st.markdown(f"**{comp['name']}** ({pct_display})")
+                    with c2:
+                        pct = st.number_input("함유량(%)", value=comp['pct'] or 0.0,
+                            min_value=0.0, max_value=100.0, step=0.1,
+                            key=f"conc_pct_manual_{key}_{i}", label_visibility="collapsed")
+                    with c3:
+                        cls = st.selectbox(f"{comp['name']} 구분", cfg['options'],
+                            key=f"conc_cls_manual_{key}_{i}", label_visibility="collapsed")
+
+                    comp_class_data.append({'name': comp['name'], 'pct': pct, 'cls': cls})
+
+                st.markdown("---")
+                if st.button(f"📊 분류 판정", key=f"calc_conc_manual_{key}"):
+                    recommendation, details, sums = judge_classification(key, comp_class_data)
+
+                    st.markdown("**함유량 합산:**")
+                    code = f"  구분1 합계: {sums['cls1']:.2f}%\n  구분2 합계: {sums['cls2']:.2f}%"
+                    if sums['unknown'] > 0: code += f"\n  ⚠ 자료없음: {sums['unknown']:.2f}%"
+                    st.code(code)
+
+                    for d in details:
+                        st.write(f"  → {d}")
+
+                    if recommendation != "분류되지 않음":
+                        st.markdown(f'<div class="result-box">📌 <b>판정: {recommendation}</b></div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'<div class="calc-box">📌 <b>판정: 분류되지 않음</b></div>', unsafe_allow_html=True)
+
+                    st.session_state[f'conc_result_{key}'] = recommendation
+
+                if f'conc_result_{key}' in st.session_state:
+                    st.markdown("---")
+                    st.markdown("**최종 판정 결과** (수정 가능):")
+                    edited_result = st.text_input(
+                        "판정 결과", value=st.session_state[f'conc_result_{key}'],
+                        key=f"edit_conc_manual_{key}", label_visibility="collapsed")
+
+                    if st.button(f"✅ 이 결과를 확정합니다", key=f"confirm_conc_manual_{key}"):
+                        st.session_state.confirmed_classifications[key] = edited_result
+                        st.success(f"✅ {label}: {edited_result} 확정!")
+                        st.rerun()
+
+        continue  # 발암성은 여기서 처리 완료, 아래 일반 로직 건너뜀
+    # ============================================================
+    # 발암성 이외 나머지 항목: 기존 로직 유지
+    # ============================================================
     st.markdown(f'<div class="field-header">📋 {label}</div>', unsafe_allow_html=True)
     cur = st.session_state.section11_data['나_건강_유해성_정보'].get(key, '')
     val = st.text_area(label, value=cur, height=80, placeholder=ph or "조회 결과가 여기에 표시됩니다.",
@@ -873,3 +1203,6 @@ with c2:
 with st.expander("저장된 데이터 확인"):
     st.json(st.session_state.section11_data)
     st.json(st.session_state.confirmed_classifications)
+    if st.session_state.carcinogen_agency_data:
+        st.markdown("**🏛️ 기관별 발암성 분류 데이터:**")
+        st.json(st.session_state.carcinogen_agency_data)
