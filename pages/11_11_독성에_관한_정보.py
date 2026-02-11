@@ -667,6 +667,8 @@ def auto_select_conservative(all_results, prefix="chk11"):
     for r in all_results:
         if r.get('no_data'):
             continue
+        if r['field'] == '발암성':
+            continue  # 발암성은 자동 반영 → 보수적 선택 제외
         groups[(r['mat'], r['field'])].append(r)
 
     for (mat, fk), items in groups.items():
@@ -791,9 +793,10 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
                 prog.progress(step / total, f"🔵 국제DB: {m['name']}...")
                 pr = query_pubchem(m['cas'])
                 if pr.get('success'):
+                    KOSHA_ONLY_FIELDS = {'발암성'}
                     for item in pr['raw_items']:
                         fk = classify_item(item['name'], item.get('detail', ''))
-                        if fk:
+                        if fk and fk not in KOSHA_ONLY_FIELDS:
                             all_results.append({'mat': m['name'], 'cas': m['cas'], 'pct': m['pct'],
                                 'src': 'PubChem', 'field': fk, 'label': item['name'], 'detail': item['detail']})
                             mat_field_found[m['name']].add(fk)
@@ -808,18 +811,36 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
             prog.progress(1.0, "✅ 조회 완료!")
             for i, r in enumerate(all_results): r['idx'] = i
 
-            # ── 발암성 데이터 즉시 기관별 파싱 ──
+            # ── 발암성: KOSHA 데이터 전부 자동 반영 (선택 없이) ──
+            carc_by_mat = {}  # {물질명: [detail, ...]}
             for r in all_results:
                 if r['field'] == '발암성' and not r.get('no_data') and r.get('detail'):
-                    parsed = parse_carcinogen_text(r['detail'])
-                    if parsed:
-                        mat_name = r['mat']
-                        existing = st.session_state.carcinogen_agency_data.get(mat_name, {})
-                        for ag_key, ag_val in parsed.items():
-                            # 기존에 해당없음이거나 없으면 덮어쓰기
-                            if existing.get(ag_key, "해당없음") == "해당없음":
-                                existing[ag_key] = ag_val
-                        st.session_state.carcinogen_agency_data[mat_name] = existing
+                    mat_name = r['mat']
+                    if mat_name not in carc_by_mat:
+                        carc_by_mat[mat_name] = []
+                    carc_by_mat[mat_name].append(r['detail'])
+
+            # 텍스트 영역에 자동 반영
+            if carc_by_mat:
+                carc_lines = []
+                for mat_name, details in carc_by_mat.items():
+                    for d in details:
+                        carc_lines.append(f"{mat_name}: {d}")
+                combined_carc = "\n".join(carc_lines)
+                st.session_state.section11_data['나_건강_유해성_정보']['발암성'] = combined_carc
+                if 's11_발암성' in st.session_state:
+                    st.session_state['s11_발암성'] = combined_carc
+
+            # 기관별 파싱
+            for mat_name, details in carc_by_mat.items():
+                merged_text = " ".join(details)
+                parsed = parse_carcinogen_text(merged_text)
+                if parsed:
+                    existing = st.session_state.carcinogen_agency_data.get(mat_name, {})
+                    for ag_key, ag_val in parsed.items():
+                        if existing.get(ag_key, "해당없음") == "해당없음":
+                            existing[ag_key] = ag_val
+                    st.session_state.carcinogen_agency_data[mat_name] = existing
 
             st.session_state['s11_all'] = all_results
             st.rerun()
@@ -840,6 +861,18 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
         for fk, fl, _, _ in TOXICITY_FIELDS:
             items_in_field = [r for r in all_results if r['field'] == fk]
             if not items_in_field: continue
+
+            # ── 발암성: 선택 없이 자동 반영 표시 ──
+            if fk == '발암성':
+                st.markdown(f'<div class="field-header">📋 {fl} <span style="color:#4caf50; font-size:0.85em;">✅ KOSHA 데이터 자동 반영됨</span></div>', unsafe_allow_html=True)
+                for r in items_in_field:
+                    if r.get('no_data'):
+                        st.markdown(f"  ⬜ {r['mat']}: 자료없음")
+                    else:
+                        st.markdown(f"  🟢 **KOSHA** | {r['mat']}: {r['detail'][:160]}")
+                st.markdown("")
+                continue
+
             st.markdown(f'<div class="field-header">📋 {fl}</div>', unsafe_allow_html=True)
             for r in items_in_field:
                 idx = r['idx']
@@ -863,41 +896,23 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
         st.markdown("---")
         if st.button("✅ 선택한 데이터를 입력란에 반영", type="primary", key="apply_s11"):
             selected_by_field = {fk: [] for fk, _, _, _ in TOXICITY_FIELDS}
-            # 발암성 기관별 파싱용: {물질명: [detail텍스트, ...]}
-            carc_selected_by_mat = {}
             for r in all_results:
+                # 발암성은 이미 자동 반영됨 → 스킵
+                if r['field'] == '발암성':
+                    continue
                 if st.session_state.get(f"chk11_{r['idx']}", False):
                     selected_by_field[r['field']].append(f"{r['mat']}: {r['detail']}")
-                    # 발암성이면 물질별로 detail 모아두기
-                    if r['field'] == '발암성' and not r.get('no_data'):
-                        if r['mat'] not in carc_selected_by_mat:
-                            carc_selected_by_mat[r['mat']] = []
-                        carc_selected_by_mat[r['mat']].append(r['detail'])
 
             applied = 0
             for fk, _, _, _ in TOXICITY_FIELDS:
+                if fk == '발암성':
+                    continue  # 발암성은 조회 시 이미 반영
                 if selected_by_field[fk]:
                     combined = "\n".join(selected_by_field[fk])
                     st.session_state.section11_data['나_건강_유해성_정보'][fk] = combined
                     wk = f"s11_{fk}"
                     if wk in st.session_state: st.session_state[wk] = combined
                     applied += len(selected_by_field[fk])
-
-            # ── 발암성: 선택된 텍스트에서 기관별 분류 자동 파싱 → 드롭다운 반영 ──
-            if carc_selected_by_mat:
-                for mat_name, detail_list in carc_selected_by_mat.items():
-                    merged_text = " ".join(detail_list)
-                    parsed = parse_carcinogen_text(merged_text)
-                    if parsed:
-                        existing = st.session_state.carcinogen_agency_data.get(mat_name, {})
-                        for ag_key, ag_val in parsed.items():
-                            existing[ag_key] = ag_val
-                        st.session_state.carcinogen_agency_data[mat_name] = existing
-
-                # 파싱된 기관 수 계산
-                total_parsed = sum(len(v) for v in st.session_state.carcinogen_agency_data.values() if isinstance(v, dict))
-                if total_parsed > 0:
-                    st.success(f"🏛️ 발암성 기관별 분류 {total_parsed}건 자동 파싱 완료! → 아래 '기관별 발암성 분류' 패널에 반영됨")
 
             if applied > 0:
                 st.success(f"✅ {applied}개 값 반영!")
