@@ -232,30 +232,36 @@ def get_most_conservative_ghs(agency_selections):
 
 def parse_carcinogen_text(text):
     """발암성 관련 텍스트에서 기관별 분류를 자동 파싱하여 딕셔너리로 반환.
-    KOSHA API 결과 예시:
-      'IARC: 1(Group 1), 산업안전보건법: 구분 1A, ACGIH: A1, NTP: Known to be Human Carcinogen'
-      'IARC 그룹 2B / NTP RAHC / ACGIH A3'
-    반환: {'IARC': 'Group 2B (인체 발암성 가능)', 'NTP': 'RAHC (...)', ...}
+    KOSHA API 반환 형식 예시:
+      'IARC : 1(사람에게 발암성이 있는 물질)|산업안전보건법 : 구분1A|ACGIH : A2|NTP : K'
+      'IARC-1, ACGIH-A2, NTP-Known'
+      '구분 1A (발암성) IARC Group 2B'
+    반환: {'IARC': 'Group 1 (인체 발암성 확인)', ...}
     """
     if not text:
         return {}
 
     result = {}
-    tl = text.lower().replace('\n', ' ').replace('|', ' ')
+    # 전처리: 파이프(|) → 공백, 줄바꿈 → 공백
+    tl = text.lower().replace('|', ' ').replace('\n', ' ').replace('\r', ' ')
 
     # ── IARC ──
     iarc_patterns = [
-        (r'iarc\s*[:\-]?\s*(?:group\s*)?1(?:\s|\b|[^0-9ab])', 'Group 1 (인체 발암성 확인)'),
-        (r'iarc\s*[:\-]?\s*(?:group\s*)?2\s*a', 'Group 2A (인체 발암성 추정)'),
-        (r'iarc\s*[:\-]?\s*(?:group\s*)?2\s*b', 'Group 2B (인체 발암성 가능)'),
-        (r'iarc\s*[:\-]?\s*(?:group\s*)?3(?:\s|\b)', 'Group 3 (인체 발암성 미분류)'),
+        # "IARC : 1(" or "IARC-1" or "IARC 1군" (Group 1 확인)
+        (r'iarc\s*[:\-=]?\s*(?:group\s*)?1\s*[(\s군]', 'Group 1 (인체 발암성 확인)'),
+        (r'iarc\s*[:\-=]?\s*(?:group\s*)?1(?:\s|$|,)', 'Group 1 (인체 발암성 확인)'),
+        (r'(?:group|그룹)\s*1(?:\s|$|[^0-9ab])', 'Group 1 (인체 발암성 확인)'),
         (r'1\s*군', 'Group 1 (인체 발암성 확인)'),
-        (r'2a\s*군', 'Group 2A (인체 발암성 추정)'),
-        (r'2b\s*군', 'Group 2B (인체 발암성 가능)'),
-        (r'group\s*1(?:\s|\b|[^0-9ab])', 'Group 1 (인체 발암성 확인)'),
-        (r'group\s*2\s*a', 'Group 2A (인체 발암성 추정)'),
-        (r'group\s*2\s*b', 'Group 2B (인체 발암성 가능)'),
-        (r'group\s*3', 'Group 3 (인체 발암성 미분류)'),
+        # Group 2A
+        (r'iarc\s*[:\-=]?\s*(?:group\s*)?2\s*a', 'Group 2A (인체 발암성 추정)'),
+        (r'(?:group|그룹)\s*2\s*a', 'Group 2A (인체 발암성 추정)'),
+        (r'2\s*a\s*군', 'Group 2A (인체 발암성 추정)'),
+        # Group 2B
+        (r'iarc\s*[:\-=]?\s*(?:group\s*)?2\s*b', 'Group 2B (인체 발암성 가능)'),
+        (r'(?:group|그룹)\s*2\s*b', 'Group 2B (인체 발암성 가능)'),
+        (r'2\s*b\s*군', 'Group 2B (인체 발암성 가능)'),
+        # Group 3
+        (r'iarc\s*[:\-=]?\s*(?:group\s*)?3(?:\s|$|[^0-9])', 'Group 3 (인체 발암성 미분류)'),
     ]
     for pat, val in iarc_patterns:
         if re.search(pat, tl):
@@ -264,28 +270,24 @@ def parse_carcinogen_text(text):
 
     # ── ACGIH ──
     acgih_patterns = [
-        (r'acgih\s*[:\-]?\s*a\s*1', 'A1 (인체 발암성 확인)'),
-        (r'acgih\s*[:\-]?\s*a\s*2', 'A2 (인체 발암성 의심)'),
-        (r'acgih\s*[:\-]?\s*a\s*3', 'A3 (동물 발암성 확인)'),
-        (r'acgih\s*[:\-]?\s*a\s*4', 'A4 (인체 발암성 미분류)'),
-        (r'acgih\s*[:\-]?\s*a\s*5', 'A5 (인체 발암성 의심 안됨)'),
-        (r'(?<!\w)a1\s*\(', 'A1 (인체 발암성 확인)'),
-        (r'(?<!\w)a2\s*\(', 'A2 (인체 발암성 의심)'),
-        (r'(?<!\w)a3\s*\(', 'A3 (동물 발암성 확인)'),
-        (r'(?<!\w)a4\s*\(', 'A4 (인체 발암성 미분류)'),
-        (r'(?<!\w)a5\s*\(', 'A5 (인체 발암성 의심 안됨)'),
+        (r'acgih\s*[:\-=]?\s*a\s*1', 'A1 (인체 발암성 확인)'),
+        (r'acgih\s*[:\-=]?\s*a\s*2', 'A2 (인체 발암성 의심)'),
+        (r'acgih\s*[:\-=]?\s*a\s*3', 'A3 (동물 발암성 확인)'),
+        (r'acgih\s*[:\-=]?\s*a\s*4', 'A4 (인체 발암성 미분류)'),
+        (r'acgih\s*[:\-=]?\s*a\s*5', 'A5 (인체 발암성 의심 안됨)'),
     ]
     for pat, val in acgih_patterns:
         if re.search(pat, tl):
             result['ACGIH'] = val
             break
 
-    # ── NTP ──
+    # ── NTP ── (K=Known, R/RAHC=Reasonably Anticipated)
     ntp_patterns = [
-        (r'ntp\s*[:\-]?\s*known', 'Known (인체 발암성 물질)'),
-        (r'ntp\s*[:\-]?\s*r(?:ahc|easonab)', 'RAHC (합리적으로 인체 발암성 예상)'),
+        (r'ntp\s*[:\-=]?\s*k(?:nown|\s|\(|$|,)', 'Known (인체 발암성 물질)'),
+        (r'ntp\s*[:\-=]?\s*r(?:ahc|\s|\(|easonab)', 'RAHC (합리적으로 인체 발암성 예상)'),
         (r'known\s*(?:to\s*be\s*)?(?:human\s*)?carcinogen', 'Known (인체 발암성 물질)'),
         (r'reasonably\s*anticipated', 'RAHC (합리적으로 인체 발암성 예상)'),
+        (r'사람\s*발암성\s*물질로\s*알려진', 'Known (인체 발암성 물질)'),
     ]
     for pat, val in ntp_patterns:
         if re.search(pat, tl):
@@ -294,7 +296,7 @@ def parse_carcinogen_text(text):
 
     # ── OSHA ──
     osha_patterns = [
-        (r'osha\s*[:\-]?\s*(?:listed|규제)', 'Listed (발암성 물질 목록)'),
+        (r'osha\s*[:\-=]?\s*(?:listed|규제|해당)', 'Listed (발암성 물질 목록)'),
     ]
     for pat, val in osha_patterns:
         if re.search(pat, tl):
@@ -303,9 +305,9 @@ def parse_carcinogen_text(text):
 
     # ── 산업안전보건법 ──
     osh_act_patterns = [
-        (r'산업안전보건법\s*[:\-]?\s*구분\s*1\s*a', '구분 1A (알려진 인체 발암성 물질)'),
-        (r'산업안전보건법\s*[:\-]?\s*구분\s*1\s*b', '구분 1B (인체 발암성 추정 물질)'),
-        (r'산업안전보건법\s*[:\-]?\s*구분\s*2', '구분 2 (인체 발암성 의심 물질)'),
+        (r'산업안전보건법\s*[:\-=]?\s*구분\s*1\s*a', '구분 1A (알려진 인체 발암성 물질)'),
+        (r'산업안전보건법\s*[:\-=]?\s*구분\s*1\s*b', '구분 1B (인체 발암성 추정 물질)'),
+        (r'산업안전보건법\s*[:\-=]?\s*구분\s*2', '구분 2 (인체 발암성 의심 물질)'),
     ]
     for pat, val in osh_act_patterns:
         if re.search(pat, tl):
@@ -314,9 +316,9 @@ def parse_carcinogen_text(text):
 
     # ── 고용노동부 고시 ──
     moel_patterns = [
-        (r'고용노동부\s*(?:고시)?\s*[:\-]?\s*구분\s*1\s*a', '구분 1A (알려진 인체 발암성 물질)'),
-        (r'고용노동부\s*(?:고시)?\s*[:\-]?\s*구분\s*1\s*b', '구분 1B (인체 발암성 추정 물질)'),
-        (r'고용노동부\s*(?:고시)?\s*[:\-]?\s*구분\s*2', '구분 2 (인체 발암성 의심 물질)'),
+        (r'고용노동부\s*(?:고시)?\s*[:\-=]?\s*구분\s*1\s*a', '구분 1A (알려진 인체 발암성 물질)'),
+        (r'고용노동부\s*(?:고시)?\s*[:\-=]?\s*구분\s*1\s*b', '구분 1B (인체 발암성 추정 물질)'),
+        (r'고용노동부\s*(?:고시)?\s*[:\-=]?\s*구분\s*2', '구분 2 (인체 발암성 의심 물질)'),
     ]
     for pat, val in moel_patterns:
         if re.search(pat, tl):
@@ -325,11 +327,11 @@ def parse_carcinogen_text(text):
 
     # ── EU CLP ──
     eu_patterns = [
-        (r'(?:eu\s*clp|clp)\s*[:\-]?\s*(?:carc\.?\s*)?1\s*a', 'Carc. 1A (알려진 인체 발암성)'),
-        (r'(?:eu\s*clp|clp)\s*[:\-]?\s*(?:carc\.?\s*)?1\s*b', 'Carc. 1B (추정 인체 발암성)'),
-        (r'(?:eu\s*clp|clp)\s*[:\-]?\s*(?:carc\.?\s*)?2', 'Carc. 2 (의심되는 인체 발암성)'),
-        (r'carc\.\s*1a', 'Carc. 1A (알려진 인체 발암성)'),
-        (r'carc\.\s*1b', 'Carc. 1B (추정 인체 발암성)'),
+        (r'(?:eu\s*clp|clp)\s*[:\-=]?\s*(?:carc\.?\s*)?1\s*a', 'Carc. 1A (알려진 인체 발암성)'),
+        (r'(?:eu\s*clp|clp)\s*[:\-=]?\s*(?:carc\.?\s*)?1\s*b', 'Carc. 1B (추정 인체 발암성)'),
+        (r'(?:eu\s*clp|clp)\s*[:\-=]?\s*(?:carc\.?\s*)?2', 'Carc. 2 (의심되는 인체 발암성)'),
+        (r'carc\.\s*1\s*a', 'Carc. 1A (알려진 인체 발암성)'),
+        (r'carc\.\s*1\s*b', 'Carc. 1B (추정 인체 발암성)'),
         (r'carc\.\s*2', 'Carc. 2 (의심되는 인체 발암성)'),
     ]
     for pat, val in eu_patterns:
@@ -339,9 +341,9 @@ def parse_carcinogen_text(text):
 
     # ── 환경부 ──
     env_patterns = [
-        (r'환경부\s*[:\-]?\s*구분\s*1\s*a', '구분 1A (알려진 인체 발암성 물질)'),
-        (r'환경부\s*[:\-]?\s*구분\s*1\s*b', '구분 1B (인체 발암성 추정 물질)'),
-        (r'환경부\s*[:\-]?\s*구분\s*2', '구분 2 (인체 발암성 의심 물질)'),
+        (r'환경부\s*[:\-=]?\s*구분\s*1\s*a', '구분 1A (알려진 인체 발암성 물질)'),
+        (r'환경부\s*[:\-=]?\s*구분\s*1\s*b', '구분 1B (인체 발암성 추정 물질)'),
+        (r'환경부\s*[:\-=]?\s*구분\s*2', '구분 2 (인체 발암성 의심 물질)'),
     ]
     for pat, val in env_patterns:
         if re.search(pat, tl):
@@ -350,16 +352,16 @@ def parse_carcinogen_text(text):
 
     # ── NITE ──
     nite_patterns = [
-        (r'nite\s*[:\-]?\s*(?:구분\s*)?1\s*a', '구분 1A (알려진 인체 발암성 물질)'),
-        (r'nite\s*[:\-]?\s*(?:구분\s*)?1\s*b', '구분 1B (인체 발암성 추정 물질)'),
-        (r'nite\s*[:\-]?\s*(?:구분\s*)?2', '구분 2 (인체 발암성 의심 물질)'),
+        (r'nite\s*[:\-=]?\s*(?:구분\s*)?1\s*a', '구분 1A (알려진 인체 발암성 물질)'),
+        (r'nite\s*[:\-=]?\s*(?:구분\s*)?1\s*b', '구분 1B (인체 발암성 추정 물질)'),
+        (r'nite\s*[:\-=]?\s*(?:구분\s*)?2', '구분 2 (인체 발암성 의심 물질)'),
     ]
     for pat, val in nite_patterns:
         if re.search(pat, tl):
             result['NITE'] = val
             break
 
-    # ── 일반 GHS 구분 (기관 미특정 → 산업안전보건법으로 간주) ──
+    # ── 일반 GHS 구분 (기관 미특정 → 산업안전보건법 + 고용노동부 동시 적용) ──
     if '산업안전보건법' not in result and '고용노동부고시' not in result:
         ghs_generic = [
             (r'(?:발암성\s*)?구분\s*1\s*a', '구분 1A (알려진 인체 발암성 물질)'),
@@ -835,12 +837,19 @@ with st.expander("🔍 KOSHA + 국제DB(PubChem) 동시 조회", expanded=False)
             for mat_name, details in carc_by_mat.items():
                 merged_text = " ".join(details)
                 parsed = parse_carcinogen_text(merged_text)
+                existing = st.session_state.carcinogen_agency_data.get(mat_name, {})
+                existing['_raw_text'] = merged_text  # 원문 저장
                 if parsed:
-                    existing = st.session_state.carcinogen_agency_data.get(mat_name, {})
                     for ag_key, ag_val in parsed.items():
-                        if existing.get(ag_key, "해당없음") == "해당없음":
-                            existing[ag_key] = ag_val
-                    st.session_state.carcinogen_agency_data[mat_name] = existing
+                        existing[ag_key] = ag_val
+                st.session_state.carcinogen_agency_data[mat_name] = existing
+
+            # ★ 핵심: 기존 위젯 키 강제 삭제 → rerun 후 새 값으로 위젯 생성됨
+            for ci_tmp, comp_tmp in enumerate(components):
+                for ag_key_tmp in CARCINOGEN_AGENCIES:
+                    wk = f"carc_{ci_tmp}_{ag_key_tmp}"
+                    if wk in st.session_state:
+                        del st.session_state[wk]
 
             st.session_state['s11_all'] = all_results
             st.rerun()
@@ -1096,23 +1105,27 @@ for key, label, kws, ph in TOXICITY_FIELDS[3:]:
                         pct_display = f"{comp['pct']}%" if comp['pct'] is not None else "미입력"
                         st.markdown(f"**{comp['name']}** (CAS: {comp['cas']}, 함유량: {pct_display})")
 
+                        # KOSHA 원문 표시
+                        carc_raw = st.session_state.carcinogen_agency_data.get(comp['name'], {}).get('_raw_text', '')
+                        if carc_raw:
+                            st.markdown(f'<div class="calc-box">📄 <b>KOSHA 원문:</b> {carc_raw}</div>', unsafe_allow_html=True)
+                        parsed_data = st.session_state.carcinogen_agency_data.get(comp['name'], {})
+                        parsed_display = {k: v for k, v in parsed_data.items() if k != '_raw_text' and v != '해당없음'}
+                        if parsed_display:
+                            st.markdown(f'<div class="result-box">🔍 <b>자동 파싱 결과:</b> {parsed_display}</div>', unsafe_allow_html=True)
+
                         # 기관별 선택 영역
                         agency_selections = {}
                         for ag_key, ag_cfg in CARCINOGEN_AGENCIES.items():
                             ss_key = f"carc_{ci}_{ag_key}"
 
-                            # carcinogen_agency_data에 파싱된 값이 있으면 우선 반영
-                            parsed_val = st.session_state.carcinogen_agency_data.get(comp['name'], {}).get(ag_key, None)
+                            # carcinogen_agency_data에서 파싱된 값 가져오기
+                            parsed_val = st.session_state.carcinogen_agency_data.get(comp['name'], {}).get(ag_key, "해당없음")
 
-                            if parsed_val and parsed_val in ag_cfg['options']:
-                                # API 파싱 결과가 있으면 위젯 key도 강제 업데이트
-                                if ss_key not in st.session_state or st.session_state.get(ss_key) == "해당없음":
+                            # 위젯 키가 아직 없으면 파싱 값으로 세팅
+                            if ss_key not in st.session_state:
+                                if parsed_val in ag_cfg['options']:
                                     st.session_state[ss_key] = parsed_val
-                                idx = ag_cfg['options'].index(st.session_state.get(ss_key, parsed_val))
-                            elif ss_key in st.session_state and st.session_state[ss_key] in ag_cfg['options']:
-                                idx = ag_cfg['options'].index(st.session_state[ss_key])
-                            else:
-                                idx = 0
 
                             c_label, c_sel = st.columns([1.5, 3])
                             with c_label:
@@ -1121,7 +1134,6 @@ for key, label, kws, ph in TOXICITY_FIELDS[3:]:
                                 sel = st.selectbox(
                                     ag_cfg['label'],
                                     ag_cfg['options'],
-                                    index=idx,
                                     key=ss_key,
                                     label_visibility="collapsed"
                                 )
